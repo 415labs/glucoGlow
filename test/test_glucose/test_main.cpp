@@ -195,7 +195,7 @@ void test_clamp_misc() {
   settingsClamp(s);
   TEST_ASSERT_TRUE(s.dayStartMin < 1440);
   TEST_ASSERT_TRUE(s.nightStartMin < 1440);
-  TEST_ASSERT_EQUAL(ALERT_BLINK_FAST, s.criticalLowMode);
+  TEST_ASSERT_EQUAL(ALERT_PULSE_FAST, s.criticalLowMode);
   TEST_ASSERT_EQUAL(ALERT_PULSE, s.cautionMode);
   TEST_ASSERT_EQUAL(1, s.units);
 }
