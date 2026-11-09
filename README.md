@@ -17,7 +17,7 @@ Four thresholds (defaults in mg/dL, all editable in the web app):
 
 No data for 15 min (editable) = **stale** (blue).
 
-**The OLED is a single-color (white) panel**, so zones are shown as a number plus a label (`CRIT LOW`, `LOW`, `HIGH`, `CRIT HIGH`, `STALE`) and an alert pattern (blink / pulse). The web app shows them in color.
+**The OLED is a single-color (white) panel**, so zones are shown as a number plus a label (`CRIT LOW`, `LOW`, `HIGH`, `CRIT HIGH`, `STALE`) and an alert pattern. The web app shows them in color.
 
 ## Brightness
 Day and night are never switched off: night is dim but always visible. In the web app set the day start / night start times, and the display brightness for day and night separately. Moving a brightness slider previews it on the device immediately.
@@ -51,7 +51,7 @@ Once the device is on your home WiFi you can also use `http://glucoglow.local` (
 ## What it does
 - Polls LibreLinkUp every **60 s by default** (30-900 s in the web app).
 - Shows glucose (mg/dL or mmol/L), trend arrow and minutes since the reading.
-- Alert pattern per zone: steady, blink slow, blink fast, pulse, or 3 blinks + pause (defaults: critical low fast blink, critical high slow blink, caution pulse, no data 3 blinks).
+- Alert pattern per zone (steady, blink slow/fast, slow/fast pulse, 3 blinks + pause). Critical animates only the **arrow** (default: fast pulse), no/stale data animates only the **STALE** text (default: slow pulse), caution pulses the whole screen. The number never blinks. On the monochrome OLED a pulse is a blink that stays on most of the time.
 - The onboard blue LED is always off.
 
 ## Install (no tools needed)

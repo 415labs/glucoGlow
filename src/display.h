@@ -37,7 +37,7 @@ class Display {
   bool isNight() const { return night_; }
 
  private:
-  void drawView(const View& v, const Settings& s, int sx, int sy);
+  void drawView(const View& v, const Settings& s, int sx, int sy, bool elemOn);
   void drawArrow(int cx, int cy, int dir);
   void setContrastIfChanged(uint8_t c);
   void drawChart(const Settings& s, int32_t nowS);

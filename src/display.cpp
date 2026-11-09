@@ -177,7 +177,23 @@ static int setValueFont(const char* text, int maxW) {
   return w;
 }
 
-void Display::drawView(const View& v, const Settings& s, int sx, int sy) {
+// On/off phase for an animated element (an OLED pixel is on or off, so a "pulse" is a blink that
+// stays on most of the time).
+static bool elementPhase(AlertMode m, uint32_t now) {
+  switch (m) {
+    case ALERT_BLINK_SLOW: return ((now / 750) % 2) == 0;
+    case ALERT_BLINK_FAST: return ((now / 150) % 2) == 0;
+    case ALERT_PULSE: return (now % 2000) < 1400;      // slow pulse
+    case ALERT_PULSE_FAST: return (now % 500) < 350;   // fast pulse
+    case ALERT_TRIPLE: {
+      uint32_t t = now % 2600;
+      return t < 600 && (t % 200) < 100;
+    }
+    default: return true;
+  }
+}
+
+void Display::drawView(const View& v, const Settings& s, int sx, int sy, bool elemOn) {
   u8g2.clearBuffer();
   const bool stale = v.state == State::Stale;
   const bool show = v.haveValue && !stale && v.state != State::Unknown;
@@ -196,6 +212,12 @@ void Display::drawView(const View& v, const Settings& s, int sx, int sy) {
     else snprintf(age, sizeof age, "%dh", v.ageMin / 60);
   }
   const char* label = labelFor(v.state);
+  const bool crit = v.state == State::CriticalLow || v.state == State::CriticalHigh;
+  const bool arrowShown = show && s.showArrow && v.trendKnown;
+  // Critical: the arrow animates (the label if there is no arrow). Stale: the STALE label.
+  const bool drawArrowNow = arrowShown && (!crit || elemOn);
+  const bool labelAnimated = (crit && !arrowShown) || stale;
+  const bool drawLabelNow = *label && (!labelAnimated || elemOn);
 
   if (!portrait_) {
     // Landscape 72x40: value left, arrow right, age bottom-left, label bottom-right
@@ -207,10 +229,10 @@ void Display::drawView(const View& v, const Settings& s, int sx, int sy) {
       u8g2.setFont(u8g2_font_6x10_tr);
       u8g2.drawStr(60 + sx, 12 + sy, "!");
     }
-    if (show && s.showArrow && v.trendKnown) drawArrow(62 + sx, 12 + sy, v.trendDir);
+    if (drawArrowNow) drawArrow(62 + sx, 12 + sy, v.trendDir);
     u8g2.setFont(u8g2_font_5x7_tr);
     if (age[0]) u8g2.drawStr(sx, 39 + sy, age);
-    if (*label) u8g2.drawStr(72 - u8g2.getStrWidth(label) - 2 + sx, 39 + sy, label);
+    if (drawLabelNow) u8g2.drawStr(72 - u8g2.getStrWidth(label) - 2 + sx, 39 + sy, label);
   } else {
     // Portrait 40x72: value on top, arrow below it, then the label, then the age
     int vw = setValueFont(buf, 40);
@@ -222,8 +244,8 @@ void Display::drawView(const View& v, const Settings& s, int sx, int sy) {
       u8g2.setFont(u8g2_font_6x10_tr);
       u8g2.drawStr(17 + sx, 42 + sy, "!");
     }
-    if (show && s.showArrow && v.trendKnown) drawArrow(20 + sx, 38 + sy, v.trendDir);
-    if (*label) {
+    if (drawArrowNow) drawArrow(20 + sx, 38 + sy, v.trendDir);
+    if (drawLabelNow) {
       u8g2.setFont(u8g2_font_5x7_tr);
       if (u8g2.getStrWidth(label) > 40) u8g2.setFont(u8g2_font_4x6_tr);
       int lw = u8g2.getStrWidth(label);
@@ -290,14 +312,21 @@ void Display::update(const View& vIn, const Settings& s, bool timeValid, int min
     contrast = previewContrast_;
   }
 
-  // Alert animation (only for non-normal states; normal stays calm)
+  // Alert animation. Caution animates the whole screen; critical animates only the arrow and
+  // stale only the STALE text (the number stays steady). Normal stays calm.
+  const bool wholeScreen = v.state == State::CautionLow || v.state == State::CautionHigh;
+  const AlertMode mode = modeFor(v.state, s);
+  const bool elemOn = elementPhase(mode, now);
   bool contentOn = true;
   float scale = 1.0f;
-  switch (modeFor(v.state, s)) {
+  if (wholeScreen) switch (mode) {
     case ALERT_BLINK_SLOW: contentOn = ((now / 750) % 2) == 0; break;
     case ALERT_BLINK_FAST: contentOn = ((now / 150) % 2) == 0; break;
     case ALERT_PULSE:
       scale = 0.3f + 0.7f * (sinf(now / 1000.0f * 2.0f * (float)M_PI / 3.0f) + 1.0f) / 2.0f;
+      break;
+    case ALERT_PULSE_FAST:
+      scale = 0.3f + 0.7f * (sinf(now / 1000.0f * 2.0f * (float)M_PI / 0.8f) + 1.0f) / 2.0f;
       break;
     case ALERT_TRIPLE: {
       uint32_t t = now % 2600;
@@ -336,5 +365,5 @@ void Display::update(const View& vIn, const Settings& s, bool timeValid, int min
     sx = step % 3;
     sy = (step / 3) % 2;
   }
-  drawView(v, s, sx, sy);
+  drawView(v, s, sx, sy, elemOn);
 }

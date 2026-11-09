@@ -21,6 +21,7 @@ static void setBool(JsonVariantConst v, bool& dst) {
 }
 
 void settingsToJson(const Settings& s, JsonDocument& d, bool secrets) {
+  d["ver"] = s.ver;
   d["wifiSsid"] = s.wifiSsid;
   d["lluEmail"] = s.lluEmail;
   d["lluRegion"] = s.lluRegion;
@@ -63,6 +64,7 @@ void settingsToJson(const Settings& s, JsonDocument& d, bool secrets) {
 }
 
 void settingsApplyJson(JsonVariantConst d, Settings& s) {
+  setNum(d["ver"], s.ver);
   setStr(d["wifiSsid"], s.wifiSsid, sizeof s.wifiSsid, false);
   setStr(d["wifiPass"], s.wifiPass, sizeof s.wifiPass, true);
   setStr(d["lluEmail"], s.lluEmail, sizeof s.lluEmail, false);
@@ -110,16 +112,32 @@ bool settingsEnsureApPass(Settings& s) {
 
 void settingsLoad(Settings& s) {
   settingsDefaults(s);
+  bool hadSaved = false;
   Preferences p;
   if (p.begin(NS, true)) {
     String json = p.getString(KEY, "");
     p.end();
     if (json.length()) {
       JsonDocument d;
-      if (!deserializeJson(d, json)) settingsApplyJson(d, s);
+      s.ver = 1;  // saved by a version before settings were numbered
+      if (!deserializeJson(d, json)) {
+        settingsApplyJson(d, s);
+        hadSaved = true;
+      }
     }
   }
+  bool migrated = false;
+  if (hadSaved && s.ver < 2) {
+    // v2: critical = fast pulse on the arrow, stale = slow pulse on the STALE text, new name.
+    s.criticalLowMode = ALERT_PULSE_FAST;
+    s.criticalHighMode = ALERT_PULSE_FAST;
+    s.staleMode = ALERT_PULSE;
+    if (!strcmp(s.hostname, "glucoled")) copyStr(s.hostname, sizeof s.hostname, "glucoglow");
+    migrated = true;
+  }
+  s.ver = SETTINGS_VERSION;
   settingsClamp(s);
+  if (migrated) settingsSave(s);
 }
 
 void settingsSave(const Settings& s) {

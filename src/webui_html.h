@@ -53,7 +53,7 @@ button.d{background:var(--crit)}
 <button class="s" onclick="post('/api/reboot','Rebooting...')">Reboot</button>
 <button class="d" onclick="resetAll()">Factory reset</button>
 <script>
-const MODES=[[0,'Steady'],[1,'Blink slow'],[2,'Blink fast'],[3,'Pulse'],[4,'3 blinks + pause']];
+const MODES=[[0,'Steady'],[1,'Blink slow'],[2,'Blink fast'],[3,'Slow pulse'],[5,'Fast pulse'],[4,'3 blinks + pause']];
 // t: text|password|number|check|select|time|range. bar: redraw the range bar on change.
 // grp: brightness group ('day'|'night'): moving the slider previews it on the device.
 const SECTIONS=[
@@ -73,11 +73,11 @@ const SECTIONS=[
  {k:'normalHigh',l:'Normal range ends at',t:'number',min:31,max:350,bar:1},
  {k:'criticalHigh',l:'Critical high: above',t:'number',min:100,max:450,bar:1},
  {k:'staleMin',l:'No new data after (minutes)',t:'number',min:5,max:120,h:'Shown as stale (blue)'}]},
-{n:'Alert patterns',f:[
- {k:'criticalLowMode',l:'Critical low (red)',t:'select',o:MODES},
- {k:'criticalHighMode',l:'Critical high (red)',t:'select',o:MODES},
- {k:'cautionMode',l:'Caution, low or high (orange)',t:'select',o:MODES},
- {k:'staleMode',l:'No / stale data (blue)',t:'select',o:MODES}]},
+{n:'Alert patterns',intro:'Critical animates only the trend arrow and no/stale data only the STALE text; the number stays steady. Caution pulses the whole screen. On the OLED a pulse is a blink that stays on most of the time.',f:[
+ {k:'criticalLowMode',l:'Critical low (red): arrow',t:'select',o:MODES},
+ {k:'criticalHighMode',l:'Critical high (red): arrow',t:'select',o:MODES},
+ {k:'cautionMode',l:'Caution, low or high (orange): whole screen',t:'select',o:MODES},
+ {k:'staleMode',l:'No / stale data (blue): STALE text',t:'select',o:MODES}]},
 {n:'Brightness',intro:'The display is never switched off: night is dim but still visible. Move a slider to preview it on the device.',f:[
  {k:'dayStartMin',l:'Day starts',t:'time'},
  {k:'nightStartMin',l:'Night starts',t:'time'},
@@ -170,6 +170,7 @@ async function chart(){
  p.forEach((a,i)=>{i?g.lineTo(X(a[0]),Y(a[1])):g.moveTo(X(a[0]),Y(a[1]))});g.stroke();
  p.forEach(a=>{g.fillStyle=col(a[1]);g.beginPath();g.arc(X(a[0]),Y(a[1]),2.5,0,7);g.fill()});
 }
+const hm12=m=>{const h=Math.floor(m/60)%24;return ((h%12)||12)+':'+String(m%60).padStart(2,'0')+' '+(h<12?'AM':'PM')};
 const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 function fill(){
  for(const s of SECTIONS)for(const x of s.f){
@@ -231,7 +232,7 @@ async function status(){
   const t=['↓↓','↘','→','↗','↑↑'][s.trendDir+2]||'';
   $('#st').innerHTML='<div><b>'+v+'</b> '+(s.trendKnown?t:'')+'</div>'+
    '<div><span class="chip '+(ZC[s.state]||'unk')+'">'+(ZN[s.state]||s.state)+'</span></div>'+
-   '<div>Device time: '+(s.localMin>=0?hm(s.localMin)+' - <b>'+(s.night?'night':'day')+'</b> brightness':'clock not synced yet - <b>night</b> brightness')+'</div>'+
+   '<div>Device time: '+(s.localMin>=0?hm12(s.localMin)+' - <b>'+(s.night?'night':'day')+'</b> brightness':'clock not synced yet - <b>night</b> brightness')+'</div>'+
    '<div>Age: '+(s.ageKnown?s.ageMin+' min':'-')+'</div>'+
    '<div>WiFi: '+(s.provisioning?'not connected':s.rssi+' dBm')+'</div>'+
    '<div>Last poll: '+(s.pollEver?(s.lastOk?'<span class="good">ok</span>':'<span class="err">'+s.lastErr+'</span>')+' ('+s.lastPollAgoS+' s ago)':'-')+'</div>'+

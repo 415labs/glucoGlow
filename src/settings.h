@@ -9,10 +9,17 @@ enum AlertMode : uint8_t {
   ALERT_BLINK_SLOW = 1,
   ALERT_BLINK_FAST = 2,
   ALERT_PULSE = 3,
-  ALERT_TRIPLE = 4  // 3 quick blinks, then a pause (port of glucoLed2 "issue" pattern)
+  ALERT_TRIPLE = 4,  // 3 quick blinks, then a pause (port of glucoLed2 "issue" pattern)
+  ALERT_PULSE_FAST = 5
+  // PULSE = slow pulse. Critical and stale patterns animate only the arrow / the STALE text;
+  // the caution pattern animates the whole screen.
 };
 
+// Bump when a default changes that existing devices should pick up.
+static const uint8_t SETTINGS_VERSION = 2;
+
 struct Settings {
+  uint8_t ver;               // settings layout version (see SETTINGS_VERSION)
   // Connection
   char wifiSsid[33];
   char wifiPass[65];
@@ -78,10 +85,11 @@ inline void settingsDefaults(Settings& s) {
   s.normalHigh = 150;
   s.criticalHigh = 200;
   s.staleMin = 15;
-  s.criticalLowMode = ALERT_BLINK_FAST;
-  s.criticalHighMode = ALERT_BLINK_SLOW;
-  s.cautionMode = ALERT_PULSE;
-  s.staleMode = ALERT_TRIPLE;
+  s.ver = SETTINGS_VERSION;
+  s.criticalLowMode = ALERT_PULSE_FAST;   // arrow only
+  s.criticalHighMode = ALERT_PULSE_FAST;  // arrow only
+  s.cautionMode = ALERT_PULSE;            // whole screen
+  s.staleMode = ALERT_PULSE;              // STALE text only, slow
   s.dayStartMin = 7 * 60;
   s.nightStartMin = 22 * 60;
   s.dayContrast = 160;
@@ -116,10 +124,10 @@ inline void settingsClamp(Settings& s) {
   s.criticalHigh = (uint16_t)clampi(s.criticalHigh, s.normalHigh + 1, 450);
   s.staleMin = (uint16_t)clampi(s.staleMin, 5, 120);
 
-  if (s.criticalLowMode > ALERT_TRIPLE) s.criticalLowMode = ALERT_BLINK_FAST;
-  if (s.criticalHighMode > ALERT_TRIPLE) s.criticalHighMode = ALERT_BLINK_SLOW;
-  if (s.cautionMode > ALERT_TRIPLE) s.cautionMode = ALERT_PULSE;
-  if (s.staleMode > ALERT_TRIPLE) s.staleMode = ALERT_TRIPLE;
+  if (s.criticalLowMode > ALERT_PULSE_FAST) s.criticalLowMode = ALERT_PULSE_FAST;
+  if (s.criticalHighMode > ALERT_PULSE_FAST) s.criticalHighMode = ALERT_PULSE_FAST;
+  if (s.cautionMode > ALERT_PULSE_FAST) s.cautionMode = ALERT_PULSE;
+  if (s.staleMode > ALERT_PULSE_FAST) s.staleMode = ALERT_PULSE;
 
   s.dayStartMin %= 1440;
   s.nightStartMin %= 1440;

@@ -271,6 +271,22 @@ void test_history_backfill_negative_times() {
   TEST_ASSERT_EQUAL(2, h.sizeInWindow(20));  // -44000 is older than 12 h
 }
 
+void test_alert_defaults_and_clamp() {
+  Settings s;
+  settingsDefaults(s);
+  TEST_ASSERT_EQUAL(ALERT_PULSE_FAST, s.criticalLowMode);   // arrow, fast pulse
+  TEST_ASSERT_EQUAL(ALERT_PULSE_FAST, s.criticalHighMode);
+  TEST_ASSERT_EQUAL(ALERT_PULSE, s.staleMode);              // STALE text, slow pulse
+  TEST_ASSERT_EQUAL_STRING("glucoglow", s.hostname);
+  TEST_ASSERT_EQUAL(SETTINGS_VERSION, s.ver);
+  s.criticalLowMode = ALERT_PULSE_FAST;
+  settingsClamp(s);
+  TEST_ASSERT_EQUAL(ALERT_PULSE_FAST, s.criticalLowMode);
+  s.criticalLowMode = 9;
+  settingsClamp(s);
+  TEST_ASSERT_EQUAL(ALERT_PULSE_FAST, s.criticalLowMode);
+}
+
 void test_chart_setting_default_on() {
   Settings s;
   settingsDefaults(s);
@@ -314,6 +330,7 @@ int main(int, char**) {
   RUN_TEST(test_rotation_setting);
   RUN_TEST(test_history_spacing_and_wrap);
   RUN_TEST(test_history_backfill_negative_times);
+  RUN_TEST(test_alert_defaults_and_clamp);
   RUN_TEST(test_chart_setting_default_on);
   RUN_TEST(test_state_names_roundtrip);
   return UNITY_END();
