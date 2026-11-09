@@ -7,9 +7,9 @@
 #include "status.h"
 
 struct WebUiHooks {
-  void (*onSettingsSaved)() = nullptr;  // apply settings live (tz, poll, LED pin, ...)
+  void (*onSettingsSaved)() = nullptr;  // apply settings live (tz, poll, rotation, ...)
   // Show a state (or keep the real one when keepState) at a brightness for N seconds.
-  void (*onPreview)(State state, bool keepState, uint8_t contrast, uint8_t led, uint16_t secs) = nullptr;
+  void (*onPreview)(State state, bool keepState, uint8_t contrast, uint16_t secs) = nullptr;
 };
 
 class WebUi {

@@ -14,6 +14,7 @@ struct DeviceStatus {
   bool provisioning = false; // setup WiFi is on because there is no working WiFi connection
   bool timeValid = false;    // NTP synced
   bool night = false;
+  int minuteOfDay = -1;      // local time as minutes after midnight, -1 = clock not synced yet
   State state = State::Unknown;
   bool haveValue = false;
   int mgdl = 0;

@@ -55,13 +55,13 @@ static void applyTime() { configTzTime(gSet.tz, "pool.ntp.org", "time.google.com
 static void onSettingsSaved() {
   applyTime();
   gLlu.configure(&gSet);     // new credentials / region / TLS mode / app version
-  gDisp.applySettings(gSet); // LED pin
+  gDisp.applySettings(gSet);  // screen rotation
   gFailCount = 0;
   gPollNow = true;           // poll right away with the new settings
 }
 
-static void onPreview(State st, bool keep, uint8_t contrast, uint8_t led, uint16_t secs) {
-  gDisp.preview(st, keep, contrast, led, secs);
+static void onPreview(State st, bool keep, uint8_t contrast, uint16_t secs) {
+  gDisp.preview(st, keep, contrast, secs);
 }
 
 // This ESP32-C3 0.42" OLED board's setup network was invisible at the default (maximum) WiFi
@@ -78,7 +78,7 @@ static bool startStation() {
   WiFi.setAutoReconnect(true);
   WiFi.begin(gSet.wifiSsid, gSet.wifiPass);
   applyTxPower();
-  gDisp.showNow("Connecting", "to WiFi:", gSet.wifiSsid);
+  gDisp.showNow("Joining", "WiFi:", gSet.wifiSsid);
   uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) delay(200);
   return WiFi.status() == WL_CONNECTED;
@@ -112,7 +112,7 @@ static void startSetupAp(bool provisioning) {
   gLastSlot = 255;
   Serial.printf("[setup] access point %s, SSID %s, IP %s\n", ok ? "started" : "FAILED", AP_SSID,
                 WiFi.softAPIP().toString().c_str());
-  if (!ok) gDisp.overlay("SETUP FAILED", "Unplug power", "and plug in", "again", 6000);
+  if (!ok) gDisp.overlay("SETUP", "FAILED", "Replug me", "", 6000);
 }
 
 static void stopSetupAp() {
@@ -126,25 +126,17 @@ static void stopSetupAp() {
   Serial.println("[setup] access point stopped");
 }
 
-// Setup instruction screens (3 pages, then back to the glucose view in between)
+// Setup instruction screens, drawn large: join the WiFi, type the password, open the browser.
+// (4th page while provisioning: what to do in the browser.)
 static void showSetupPage(int page, uint32_t ms) {
   if (page == 0) {
-    gDisp.overlay("SETUP MODE 1/3", "Join WiFi:", AP_SSID, "phone or PC", ms);
+    gDisp.overlay("1/3 JOIN", AP_SSID, "", "", ms);
   } else if (page == 1) {
-    size_t n = strlen(gSet.apPass);
-    if (n <= 12) {
-      char big[16];
-      snprintf(big, sizeof big, BIG_LINE "%s", gSet.apPass);
-      gDisp.overlay("SETUP MODE 2/3", "WiFi password:", big, "", ms);
-    } else {  // long custom password: two rows of 14 characters
-      char a[15] = {0}, b[15] = {0};
-      strncpy(a, gSet.apPass, 14);
-      strncpy(b, gSet.apPass + 14, 14);
-      gDisp.overlay("SETUP MODE 2/3", "WiFi password:", a, b, ms);
-    }
+    gDisp.overlay("2/3 PASS", gSet.apPass, "", "", ms);
+  } else if (page == 2) {
+    gDisp.overlay("3/3 OPEN", "192.168.4.1", "", "", ms);
   } else {
-    gDisp.overlay("SETUP MODE 3/3", "Open browser:", BIG_LINE "192.168.4.1",
-                  gProvisioning ? "Save, Reboot" : "BOOT 3s = exit", ms);
+    gDisp.overlay("THEN", "Save WiFi", "& Reboot", "", ms);
   }
 }
 
@@ -157,11 +149,11 @@ static void updateSetupScreens(const View& v) {
     gLastSlot = 255;
     return;
   }
-  const uint32_t slots = gProvisioning ? 3 : 4;  // 3 instruction pages (+ glucose view when available)
+  const uint32_t slots = 4;  // 3 instruction pages + (provisioning: the THEN page, else: the glucose view)
   uint8_t slot = (uint8_t)(((millis() - gApStartMs) / PAGE_MS) % slots);
   if (slot == gLastSlot) return;
   gLastSlot = slot;
-  if (slot == 3) gDisp.clearOverlay();
+  if (slot == 3 && !gProvisioning) gDisp.clearOverlay();
   else showSetupPage(slot, PAGE_MS + 300);
 }
 
@@ -170,29 +162,31 @@ static void updateSetupScreens(const View& v) {
 // ---------------------------------------------------------------------------------------------
 static void showInfoPage(int page, uint32_t ms) {
   if (page == 1) {
+    String ip = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("no WiFi");
+    gDisp.overlay("WEB APP", ip.c_str(), "", "", ms);
+  } else if (page == 2) {
     char host[32];
     snprintf(host, sizeof host, "%s.local", gSet.hostname);
-    String ip = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("no WiFi");
-    gDisp.overlay("WEB APP", host, ip.c_str(), "", ms);
+    gDisp.overlay("OR TYPE", host, "", "", ms);
   } else {
-    gDisp.overlay("SETUP HOW-TO", "Hold BOOT 3 s", "then follow", "the screens", ms);
+    gDisp.overlay("SETUP?", "Hold BOOT", "for 3 s", "", ms);
   }
 }
 
 static void toggleSetupMode() {
   if (gSetupAp) {
     if (gProvisioning) {
-      gDisp.overlay("SETUP NEEDED", "Save your WiFi", "then Reboot", "", 3000);
+      gDisp.overlay("SETUP", "Save WiFi", "& Reboot", "", 3000);
       gBusyUntil = millis() + 3000;
     } else {
       stopSetupAp();
-      gDisp.overlay("SETUP MODE", "OFF", "", "", 2000);
+      gDisp.overlay("SETUP", "MODE OFF", "", "", 2000);
       gBusyUntil = millis() + 2000;
     }
   } else {
-    gDisp.showNow("SETUP MODE", "starting...");
+    gDisp.showNow("SETUP", "starting");
     startSetupAp(false);
-    gDisp.overlay("SETUP MODE", "ON - follow", "the screens", "", 1500);
+    gDisp.overlay("SETUP ON", "Follow", "screens", "", 1500);
     gBusyUntil = millis() + 1500;
   }
 }
@@ -217,9 +211,9 @@ static void handleButton() {
       toggled = true;
       toggleSetupMode();
     } else {
-      char l4[16];
-      snprintf(l4, sizeof l4, "in %d s", (int)((HOLD_MS - held + 999) / 1000));
-      gDisp.overlay("KEEP HOLDING", gSetupAp ? "to EXIT" : "to ENTER", "SETUP MODE", l4, 400);
+      char l3[16];
+      snprintf(l3, sizeof l3, "in %d s", (int)((HOLD_MS - held + 999) / 1000));
+      gDisp.overlay("KEEP HOLD", gSetupAp ? "to EXIT" : "to ENTER", l3, "", 400);
       gBusyUntil = now + 400;
     }
   }
@@ -228,7 +222,7 @@ static void handleButton() {
     down = false;
     if (!toggled) {
       if (held >= 30 && held < SHORT_PRESS_MAX_MS) {  // a tap (ignores contact bounce)
-        infoPage = (uint8_t)((infoPage + 1) % 3);
+        infoPage = (uint8_t)((infoPage + 1) % 4);
         if (infoPage == 0) {
           gDisp.clearOverlay();
           gBusyUntil = 0;
@@ -364,7 +358,7 @@ void setup() {
   gDisp.setHistory(&gHist);
   gDisp.showNow("GlucoGlow", "v" FW_VERSION);
   delay(1000);
-  gDisp.showNow("SETUP HOW-TO", "Hold BOOT 3 s", "then follow", "the screens");  // always shown at boot
+  gDisp.showNow("SETUP?", "Hold BOOT", "for 3 s");  // always shown at boot
   delay(2500);
 
   gLlu.configure(&gSet);
@@ -406,7 +400,7 @@ void loop() {
     if (WiFi.softAPgetStationNum() > 0) gApBusyMs = now;
     if (!gProvisioning && now - gApBusyMs > SETUP_IDLE_MS) {  // forgotten setup WiFi: switch it off
       stopSetupAp();
-      gDisp.overlay("SETUP MODE", "ended (idle)", "", "", 3000);
+      gDisp.overlay("SETUP", "ENDED", "(idle)", "", 3000);
       gBusyUntil = now + 3000;
     } else if (gProvisioning && gSet.wifiSsid[0] && now - gApBusyMs > PROVISION_RETRY_MS) {
       ESP.restart();  // router was probably still booting: try the saved WiFi again
@@ -431,13 +425,14 @@ void loop() {
     // Nothing configured yet: remind how to get to the settings every 20 s
     if (!gSetupAp && !gSet.lluEmail[0] && now >= gBusyUntil && now - lastHint > 20000) {
       lastHint = now;
-      gDisp.overlay("NOT SET UP YET", "Hold BOOT 3 s", "for SETUP MODE", "(see screens)", 5000);
+      gDisp.overlay("SET ME UP", "Hold BOOT", "for 3 s", "", 5000);
     }
 #endif
 
     gDisp.update(v, gSet, tv, minOfDay);
     gSt.timeValid = tv;
     gSt.night = gDisp.isNight();
+    gSt.minuteOfDay = tv ? minOfDay : -1;
     gSt.state = v.state;
     gSt.haveValue = v.haveValue;
     gSt.mgdl = v.mgdl;

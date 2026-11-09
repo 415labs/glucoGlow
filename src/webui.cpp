@@ -100,6 +100,7 @@ static void handleStatus() {
   d["rssi"] = sta ? WiFi.RSSI() : 0;
   d["timeValid"] = s.timeValid;
   d["night"] = s.night;
+  d["localMin"] = s.minuteOfDay;
   d["state"] = stateName(s.state);
   d["haveValue"] = s.haveValue;
   d["mgdl"] = s.mgdl;
@@ -168,9 +169,8 @@ static void handlePreview() {
   State st = State::Normal;
   if (!keep && !stateFromName(sn, &st)) return sendError("unknown state");
   int c = clampi(in["contrast"] | 5, 1, 255);
-  int led = clampi(in["led"] | 5, 1, 255);
   int secs = clampi(in["seconds"] | 20, 1, 120);
-  if (gHooks.onPreview) gHooks.onPreview(st, keep, (uint8_t)c, (uint8_t)led, (uint16_t)secs);
+  if (gHooks.onPreview) gHooks.onPreview(st, keep, (uint8_t)c, (uint16_t)secs);
   JsonDocument out;
   out["ok"] = true;
   sendJson(out);

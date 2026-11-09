@@ -38,18 +38,6 @@ State classify(int mgdl, bool stale, const Settings& s) {
   return State::CriticalHigh;
 }
 
-Rgb colorFor(State s) {
-  switch (s) {
-    case State::CriticalLow:
-    case State::CriticalHigh: return {255, 0, 0};    // red
-    case State::CautionLow:
-    case State::CautionHigh: return {255, 100, 0};   // orange
-    case State::Normal: return {0, 255, 0};          // green
-    case State::Stale: return {0, 0, 255};           // blue = no fresh data
-    default: return {0, 0, 0};                       // unknown: off
-  }
-}
-
 bool trendDir(int arrow, int* dir) {
   if (arrow < 1 || arrow > 5) return false;
   *dir = arrow - 3;
@@ -96,6 +84,10 @@ bool isNight(int minuteOfDay, uint16_t dayStartMin, uint16_t nightStartMin) {
   }
   // day window wraps midnight (e.g. day 22:00 -> 07:00)
   return minuteOfDay >= nightStartMin && minuteOfDay < dayStartMin;
+}
+
+bool useNightLevel(bool timeValid, int minuteOfDay, uint16_t dayStartMin, uint16_t nightStartMin) {
+  return !timeValid || isNight(minuteOfDay, dayStartMin, nightStartMin);
 }
 
 float mgdlToMmol(int mgdl) { return mgdl / 18.016f; }

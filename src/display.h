@@ -1,10 +1,9 @@
 #pragma once
-// 72x40 OLED rendering, day/night brightness, alert animations, text screens, optional RGB LED.
+// 72x40 OLED rendering, day/night brightness, alert animations, text screens.
 // The display is never blanked: the night level is dim but always visible.
 #include <Arduino.h>
 #include "glucose.h"
 #include "history.h"
-#include "led.h"
 #include "settings.h"
 
 struct View {
@@ -17,19 +16,16 @@ struct View {
   int ageMin = 0;
 };
 
-// In text lines, a leading '\x01' draws that line in a larger font when it fits.
-#define BIG_LINE "\x01"
-
 class Display {
  public:
   void begin();
   void setHistory(const History* h) { hist_ = h; }
-  void applySettings(const Settings& s);  // (re)configures the LED pin and screen rotation
+  void applySettings(const Settings& s);  // (re)configures the screen rotation
   // Call often (every ~50 ms). `timeValid`/`minuteOfDay` drive the day/night schedule.
   void update(const View& v, const Settings& s, bool timeValid, int minuteOfDay);
 
   // Web-app preview: show a state (or keep the real one) at a given brightness for N seconds.
-  void preview(State st, bool keepState, uint8_t contrast, uint8_t ledBrightness, uint16_t seconds);
+  void preview(State st, bool keepState, uint8_t contrast, uint16_t seconds);
 
   // Immediate text screen (boot, blocking operations).
   void showNow(const char* l1, const char* l2 = "", const char* l3 = "", const char* l4 = "");
@@ -47,8 +43,7 @@ class Display {
   void drawChart(const Settings& s, int32_t nowS);
 
   const History* hist_ = nullptr;
-  Led led_;
-  char ov_[4][24] = {{0}, {0}, {0}, {0}};
+  char ov_[4][36] = {{0}, {0}, {0}, {0}};
   uint32_t ovUntil_ = 0;
   bool ovActive_ = false;
 
@@ -56,7 +51,6 @@ class Display {
   State previewState_ = State::Normal;
   bool previewKeep_ = true;
   uint8_t previewContrast_ = 30;
-  uint8_t previewLed_ = 20;
 
   uint8_t lastContrast_ = 255;
   bool night_ = false;

@@ -41,9 +41,6 @@ void settingsToJson(const Settings& s, JsonDocument& d, bool secrets) {
   d["nightStartMin"] = s.nightStartMin;
   d["dayContrast"] = s.dayContrast;
   d["nightContrast"] = s.nightContrast;
-  d["ledDay"] = s.ledDay;
-  d["ledNight"] = s.ledNight;
-  d["ledPin"] = s.ledPin;
   d["tz"] = s.tz;
   d["showArrow"] = s.showArrow;
   d["showAge"] = s.showAge;
@@ -88,9 +85,6 @@ void settingsApplyJson(JsonVariantConst d, Settings& s) {
   setNum(d["nightStartMin"], s.nightStartMin);
   setNum(d["dayContrast"], s.dayContrast);
   setNum(d["nightContrast"], s.nightContrast);
-  setNum(d["ledDay"], s.ledDay);
-  setNum(d["ledNight"], s.ledNight);
-  setNum(d["ledPin"], s.ledPin);
   setStr(d["tz"], s.tz, sizeof s.tz, false);
   setBool(d["showArrow"], s.showArrow);
   setBool(d["showAge"], s.showAge);
@@ -103,9 +97,14 @@ void settingsApplyJson(JsonVariantConst d, Settings& s) {
   if (d["clearAdminPass"].is<bool>() && d["clearAdminPass"].as<bool>()) s.adminPass[0] = 0;
 }
 
+// Setup WiFi password: "glow" + 4 random digits (WPA2 needs at least 8 characters).
+// A password you set yourself is kept; the old 8-digit generated ones are replaced.
 bool settingsEnsureApPass(Settings& s) {
-  if (strlen(s.apPass) >= 8) return false;
-  snprintf(s.apPass, sizeof s.apPass, "%08lu", (unsigned long)(esp_random() % 100000000UL));
+  size_t n = strlen(s.apPass);
+  bool oldGenerated = n == 8;
+  for (size_t i = 0; oldGenerated && i < n; i++) oldGenerated = s.apPass[i] >= '0' && s.apPass[i] <= '9';
+  if (n >= 8 && !oldGenerated) return false;
+  snprintf(s.apPass, sizeof s.apPass, "glow%04lu", (unsigned long)(esp_random() % 10000UL));
   return true;
 }
 

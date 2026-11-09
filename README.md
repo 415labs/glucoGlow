@@ -17,21 +17,10 @@ Four thresholds (defaults in mg/dL, all editable in the web app):
 
 No data for 15 min (editable) = **stale** (blue).
 
-**The OLED is a single-color (white) panel, so it cannot show red/orange/green.** Colors come from an optional external RGB LED (WS2812 / NeoPixel). The OLED shows the number plus a label (`CRIT LOW`, `LOW`, `HIGH`, `CRIT HIGH`, `STALE`) and the alert pattern (blink / pulse). The web app shows the colors too.
-
-### Optional RGB LED wiring
-Use one WS2812 LED or module (the single-LED breakout boards work well):
-
-| LED | ESP32-C3 board |
-|---|---|
-| DIN (data) | GPIO 4 (or 3, 10, 0, 1, 7, 20, 21) |
-| VCC | 3V3 (if it flickers, use the 5V pin) |
-| GND | GND |
-
-A 330 ohm resistor in series with DIN is recommended. Then open the web app, **Brightness**, set **RGB LED pin** to the GPIO you used, and **Save**. Not allowed: 2, 5, 6, 8, 9, 18, 19 (boot, OLED, onboard LED, USB). The LED follows the same colors, blink patterns and day/night brightness as the display.
+**The OLED is a single-color (white) panel**, so zones are shown as a number plus a label (`CRIT LOW`, `LOW`, `HIGH`, `CRIT HIGH`, `STALE`) and an alert pattern (blink / pulse). The web app shows them in color.
 
 ## Brightness
-Day and night are never switched off: night is dim but always visible. In the web app set the day start / night start times, and the display and LED brightness for day and night separately. Moving a brightness slider previews it on the device immediately.
+Day and night are never switched off: night is dim but always visible. In the web app set the day start / night start times, and the display brightness for day and night separately. Moving a brightness slider previews it on the device immediately.
 
 ## 12-hour chart
 The web app shows a chart of the last 12 hours (one point per 5 minutes) with your ranges as colored bands. With **Display → Show 12-hour chart** on, the same chart also appears on the OLED for 4 s out of every 12 s while glucose is normal or caution (critical and stale alerts stay on the number). Turn the option off to hide both. The history lives in RAM; after a reboot or power loss the device pulls the last 12 hours from the LibreLink server on its first successful poll (needs the clock synced by NTP), then adds one point every 5 minutes.
@@ -42,17 +31,17 @@ Mount the board however fits your shelf: in the web app, **Display → Screen ro
 ## Setup mode (change any setting at any time)
 The device keeps showing glucose while you change settings.
 
-1. **Hold the BOOT button for 3 seconds.** The screen counts down ("KEEP HOLDING... in 3 s").
+1. **Hold the BOOT button for 3 seconds.** The screen counts down ("KEEP HOLD... in 3 s").
 2. The screen then shows, one page at a time (it repeats):
    - **1/3** the WiFi to join: `GlucoGlow-setup`
-   - **2/3** the WiFi password (8 digits, generated per device)
+   - **2/3** the WiFi password: `glow` + 4 digits, generated per device
    - **3/3** the address to open: `192.168.4.1`
 3. Join that WiFi from a phone or PC, enter the password, open `http://192.168.4.1`. Every setting is there.
 4. Hold BOOT for 3 s again to leave setup mode. It also switches off by itself after 15 minutes without a connected device.
 
 Other help on the device:
 - At every power-up the screen shows "Hold BOOT 3 s, then follow the screens".
-- **Tap BOOT** to cycle info screens: the web address (`http://glucoglow.local` and the IP) and the setup how-to.
+- **Tap BOOT** to cycle info screens: the IP address, the `glucoglow.local` name, and the setup how-to.
 - If nothing is configured yet, the screen reminds you every 20 s how to start setup mode.
 - If the saved WiFi can't be reached at boot (or none is saved), setup mode starts automatically and stays on until WiFi works. If the router was just slow to start, the device reboots and retries after 2 minutes with nobody connected.
 - A critical low/high alert is never hidden behind setup screens.
@@ -84,10 +73,10 @@ Board assumptions (confirm on yours): OLED SDA = GPIO5, SCL = GPIO6; BOOT = GPIO
 1. Power the board. With no WiFi saved it starts setup mode by itself and walks you through it on the screen.
 2. Join `GlucoGlow-setup` with the password shown, open `http://192.168.4.1`.
 3. Enter your WiFi and your **LibreLinkUp** email/password (a *follower* account that has the sensor data shared with it), press **Save**, then **Reboot**.
-4. Afterwards open `http://glucoglow.local` (or the IP shown by tapping BOOT). **Test LibreLinkUp login** checks credentials without saving. The **Preview** box shows each zone on the display (and LED).
+4. Afterwards open `http://glucoglow.local` (or the IP shown by tapping BOOT). **Test LibreLinkUp login** checks credentials without saving. The **Preview** box shows each zone on the display.
 
 ## Security notes
-- The setup WiFi is protected by a per-device password that is only shown on the device's own screen.
+- The setup WiFi is protected by a per-device password (`glow` + 4 digits; WPA2 needs at least 8 characters) that is only shown on the device's own screen. Four digits is easy to type but short: it is meant for a few minutes of setup next to the device, and the setup WiFi switches itself off after 15 minutes without clients. You can set a longer password in the web app (Device section).
 - Over your home WiFi the web app is plain HTTP; set an **admin password** (user `admin`) in the Device section. Reaching it through the setup WiFi does not ask for it (the WiFi password already protects that path).
 - Passwords are write-only: the API never sends them back to the browser.
 - HTTPS to LibreLinkUp validates certificates using the built-in CA bundle. If login fails with a network/TLS error, you can enable "Skip certificate check" in the web app (weaker security).
@@ -101,7 +90,6 @@ On the tested board the setup network was invisible at the default (maximum) tra
 - `src/glucose.*` zones, colors, trend mapping, timestamp parsing, night schedule (unit tested)
 - `src/settings.h`, `src/settings_store.*` settings struct, validation, NVS storage, JSON
 - `src/display.*` OLED drawing, brightness schedule, alert animations, text screens
-- `src/led.*` optional WS2812 RGB LED
 - `src/webui.*`, `src/webui_html.h` on-device web server, JSON API and single-page UI (embedded in firmware, no external assets)
 - `test/test_glucose/` unit tests
 
@@ -110,7 +98,7 @@ On the tested board the setup network was invisible at the default (maximum) tra
 
 ## Known to verify on real hardware
 - LibreLinkUp login headers and the account-id header; the unofficial API changes over time. If login is rejected as outdated, raise **LibreLinkUp app version** in the web app (default 4.16.0).
-- The optional LED output (`neopixelWrite`) and the setup WiFi running alongside your home WiFi were not tested on hardware.
+- The setup WiFi running alongside your home WiFi was not tested on hardware.
 - Arrow and text layout on the 72x40 panel, and the text screens' line fit.
 
 

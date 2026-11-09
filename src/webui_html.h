@@ -41,7 +41,7 @@ button.d{background:var(--crit)}
 <fieldset id="chartBox" style="display:none"><legend>Last 12 hours</legend><canvas id="ch" style="width:100%;height:170px"></canvas><small id="chNote"></small></fieldset>
 <form id="f" onsubmit="return false"></form>
 <fieldset id="previewBox"><legend>Preview on the display</legend>
-<label><span>State<small>Shows this state on the device (and the LED, if connected) for 20 s</small></span><select id="pvState">
+<label><span>State<small>Shows this state on the device for 20 s</small></span><select id="pvState">
 <option value="normal">Normal (green)</option>
 <option value="caution_low">Caution low (orange)</option><option value="caution_high">Caution high (orange)</option>
 <option value="critical_low">Critical low (red)</option><option value="critical_high">Critical high (red)</option>
@@ -83,9 +83,6 @@ const SECTIONS=[
  {k:'nightStartMin',l:'Night starts',t:'time'},
  {k:'dayContrast',l:'Day: display brightness',t:'range',min:1,max:255,grp:'day'},
  {k:'nightContrast',l:'Night: display brightness',t:'range',min:1,max:255,grp:'night'},
- {k:'ledPin',l:'RGB LED pin (-1 = none)',t:'number',min:-1,max:21,h:'Optional WS2812 LED for red/orange/green, e.g. GPIO 4. See README for wiring'},
- {k:'ledDay',l:'Day: LED brightness',t:'range',min:1,max:255,grp:'day'},
- {k:'ledNight',l:'Night: LED brightness',t:'range',min:1,max:255,grp:'night'},
  {k:'tz',l:'Timezone (POSIX TZ)',t:'text',h:'US Pacific: PST8PDT,M3.2.0,M11.1.0'}]},
 {n:'Display',f:[
  {k:'showArrow',l:'Show trend arrow',t:'check'},
@@ -95,7 +92,7 @@ const SECTIONS=[
  {k:'rotation',l:'Screen rotation',t:'select',o:[[0,'0 (default)'],[90,'90 clockwise'],[180,'180 (upside down)'],[270,'270 clockwise']],h:'Pick the one that reads upright on your shelf. Applies when you press Save. 90 and 270 use a tall layout'}]},
 {n:'Device',f:[
  {k:'hostname',l:'Hostname (http://name.local)',t:'text'},
- {k:'apPass',l:'Setup WiFi password',t:'password',h:'8-32 characters. Shown on the device screen in setup mode. Applies next time setup mode starts'},
+ {k:'apPass',l:'Setup WiFi password',t:'password',h:'8-32 characters (default: glow + 4 digits). Shown on the device screen in setup mode. Applies next time setup mode starts'},
  {k:'adminPass',l:'Admin password (user: admin)',t:'password',h:'Protects this page on your home WiFi. Empty = none'},
  {k:'clearAdminPass',l:'Remove admin password',t:'check'}]}
 ];
@@ -112,9 +109,9 @@ function bar(){
  b.innerHTML=seg.map(s=>'<div class="seg '+s[1]+'" style="flex:'+Math.max(s[0],1)+'">'+s[2]+'</div>').join('');
 }
 function previewBright(g){
- const c=+$('#k_'+g+'Contrast').value,l=+$('#k_led'+(g==='day'?'Day':'Night')).value;
+ const c=+$('#k_'+g+'Contrast').value;
  clearTimeout(pvT);
- pvT=setTimeout(()=>api('/api/preview',J({state:'keep',contrast:c,led:l,seconds:10})).catch(()=>{}),250);
+ pvT=setTimeout(()=>api('/api/preview',J({state:'keep',contrast:c,seconds:10})).catch(()=>{}),250);
 }
 function build(){
  const f=$('#f');f.innerHTML='';
@@ -220,7 +217,7 @@ async function testLogin(){
  }catch(e){msg('Test failed: '+e.message,'err')}
 }
 async function preview(){
- try{await api('/api/preview',J({state:$('#pvState').value,contrast:+$('#k_dayContrast').value,led:+$('#k_ledDay').value,seconds:20}));msg('Previewing on the device for 20 s','good')}
+ try{await api('/api/preview',J({state:$('#pvState').value,contrast:+$('#k_dayContrast').value,seconds:20}));msg('Previewing on the device for 20 s','good')}
  catch(e){msg('Preview failed: '+e.message,'err')}
 }
 async function post(p,t){try{await api(p,{method:'POST'});msg(t,'good')}catch(e){msg(t,'good')}}
@@ -233,7 +230,8 @@ async function status(){
   const v=s.haveValue?(cur.units==1?(s.mgdl/18.016).toFixed(1):s.mgdl):'--';
   const t=['↓↓','↘','→','↗','↑↑'][s.trendDir+2]||'';
   $('#st').innerHTML='<div><b>'+v+'</b> '+(s.trendKnown?t:'')+'</div>'+
-   '<div><span class="chip '+(ZC[s.state]||'unk')+'">'+(ZN[s.state]||s.state)+'</span>'+(s.night?' night':' day')+'</div>'+
+   '<div><span class="chip '+(ZC[s.state]||'unk')+'">'+(ZN[s.state]||s.state)+'</span></div>'+
+   '<div>Device time: '+(s.localMin>=0?hm(s.localMin)+' - <b>'+(s.night?'night':'day')+'</b> brightness':'clock not synced yet - <b>night</b> brightness')+'</div>'+
    '<div>Age: '+(s.ageKnown?s.ageMin+' min':'-')+'</div>'+
    '<div>WiFi: '+(s.provisioning?'not connected':s.rssi+' dBm')+'</div>'+
    '<div>Last poll: '+(s.pollEver?(s.lastOk?'<span class="good">ok</span>':'<span class="err">'+s.lastErr+'</span>')+' ('+s.lastPollAgoS+' s ago)':'-')+'</div>'+

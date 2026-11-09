@@ -47,9 +47,6 @@ struct Settings {
   uint16_t nightStartMin;    // default 22:00
   uint8_t dayContrast;       // OLED 1..255
   uint8_t nightContrast;     // OLED 1..255
-  uint8_t ledDay;            // external RGB LED brightness 1..255
-  uint8_t ledNight;          // external RGB LED brightness 1..255
-  int8_t ledPin;             // GPIO of an optional WS2812 RGB LED, -1 = none
   char tz[48];               // POSIX TZ string
 
   // Display options
@@ -70,13 +67,6 @@ inline void copyStr(char* dst, size_t n, const char* src) {
 
 inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-// GPIOs that are safe for the optional LED on the ESP32-C3 0.42" OLED board
-// (5/6 = OLED, 8 = onboard LED, 9 = BOOT button, 18/19 = USB, 2 = boot strapping are excluded).
-inline bool ledPinAllowed(int pin) {
-  return pin == 0 || pin == 1 || pin == 3 || pin == 4 || pin == 7 || pin == 10 || pin == 20 ||
-         pin == 21;
-}
-
 inline void settingsDefaults(Settings& s) {
   memset(&s, 0, sizeof(s));
   copyStr(s.lluVersion, sizeof s.lluVersion, "4.16.0");
@@ -96,9 +86,6 @@ inline void settingsDefaults(Settings& s) {
   s.nightStartMin = 22 * 60;
   s.dayContrast = 160;
   s.nightContrast = 4;
-  s.ledDay = 80;
-  s.ledNight = 6;
-  s.ledPin = -1;
   copyStr(s.tz, sizeof s.tz, "PST8PDT,M3.2.0,M11.1.0");
   s.showArrow = s.showAge = s.pixelShift = s.showChart = true;
   copyStr(s.hostname, sizeof s.hostname, "glucoglow");
@@ -138,9 +125,6 @@ inline void settingsClamp(Settings& s) {
   s.nightStartMin %= 1440;
   if (s.dayContrast < 1) s.dayContrast = 1;      // never fully dark: always visible
   if (s.nightContrast < 1) s.nightContrast = 1;
-  if (s.ledDay < 1) s.ledDay = 1;
-  if (s.ledNight < 1) s.ledNight = 1;
-  if (!ledPinAllowed(s.ledPin)) s.ledPin = -1;
   if (s.rotation != 90 && s.rotation != 180 && s.rotation != 270) s.rotation = 0;
 
   // hostname: lowercase letters, digits, '-' only

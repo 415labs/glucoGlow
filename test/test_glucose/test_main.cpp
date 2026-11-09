@@ -45,29 +45,6 @@ void test_classify_follows_custom_ranges() {
   TEST_ASSERT_EQUAL((int)State::CriticalHigh, (int)classify(181, false, s));
 }
 
-void test_colors_per_zone() {
-  Rgb r = colorFor(State::CriticalLow);
-  TEST_ASSERT_EQUAL(255, r.r);
-  TEST_ASSERT_EQUAL(0, r.g);
-  TEST_ASSERT_EQUAL(0, r.b);
-  r = colorFor(State::CriticalHigh);  // both critical states are red
-  TEST_ASSERT_EQUAL(255, r.r);
-  TEST_ASSERT_EQUAL(0, r.g);
-  r = colorFor(State::Normal);  // green
-  TEST_ASSERT_EQUAL(0, r.r);
-  TEST_ASSERT_EQUAL(255, r.g);
-  TEST_ASSERT_EQUAL(0, r.b);
-  Rgb lo = colorFor(State::CautionLow);  // orange: lots of red, some green, no blue
-  Rgb hi = colorFor(State::CautionHigh);
-  TEST_ASSERT_EQUAL(255, lo.r);
-  TEST_ASSERT_TRUE(lo.g > 0 && lo.g < 200);
-  TEST_ASSERT_EQUAL(0, lo.b);
-  TEST_ASSERT_EQUAL(lo.r, hi.r);
-  TEST_ASSERT_EQUAL(lo.g, hi.g);
-  Rgb u = colorFor(State::Unknown);
-  TEST_ASSERT_EQUAL(0, u.r + u.g + u.b);
-}
-
 void test_state_helpers() {
   TEST_ASSERT_TRUE(isCritical(State::CriticalLow));
   TEST_ASSERT_TRUE(isCritical(State::CriticalHigh));
@@ -146,6 +123,17 @@ void test_is_night_equal_means_never() {
   TEST_ASSERT_FALSE(isNight(700, 420, 420));
 }
 
+void test_night_level_decision() {
+  Settings s = defaults();  // day 07:00-22:00
+  TEST_ASSERT_FALSE(useNightLevel(true, 12 * 60, s.dayStartMin, s.nightStartMin));   // noon: day
+  TEST_ASSERT_FALSE(useNightLevel(true, 21 * 60 + 59, s.dayStartMin, s.nightStartMin));  // 21:59: still day
+  TEST_ASSERT_TRUE(useNightLevel(true, 22 * 60, s.dayStartMin, s.nightStartMin));    // 22:00: night
+  TEST_ASSERT_TRUE(useNightLevel(true, 3 * 60, s.dayStartMin, s.nightStartMin));     // 03:00: night
+  TEST_ASSERT_TRUE(useNightLevel(true, 6 * 60 + 59, s.dayStartMin, s.nightStartMin));
+  TEST_ASSERT_FALSE(useNightLevel(true, 7 * 60, s.dayStartMin, s.nightStartMin));    // 07:00: day
+  TEST_ASSERT_TRUE(useNightLevel(false, 12 * 60, s.dayStartMin, s.nightStartMin));   // clock unknown: dim
+}
+
 void test_default_settings() {
   Settings s = defaults();
   TEST_ASSERT_EQUAL(60, s.pollSec);
@@ -153,7 +141,6 @@ void test_default_settings() {
   TEST_ASSERT_EQUAL(90, s.normalLow);
   TEST_ASSERT_EQUAL(150, s.normalHigh);
   TEST_ASSERT_EQUAL(200, s.criticalHigh);
-  TEST_ASSERT_EQUAL(-1, s.ledPin);
   TEST_ASSERT_TRUE(s.nightContrast >= 1);  // night is dim but visible
   TEST_ASSERT_TRUE(s.dayContrast > s.nightContrast);
   TEST_ASSERT_EQUAL_STRING("4.16.0", s.lluVersion);
@@ -193,13 +180,9 @@ void test_clamp_brightness_never_dark() {
   Settings s = defaults();
   s.dayContrast = 0;
   s.nightContrast = 0;
-  s.ledDay = 0;
-  s.ledNight = 0;
   settingsClamp(s);
   TEST_ASSERT_EQUAL(1, s.dayContrast);
   TEST_ASSERT_EQUAL(1, s.nightContrast);
-  TEST_ASSERT_EQUAL(1, s.ledDay);
-  TEST_ASSERT_EQUAL(1, s.ledNight);
 }
 
 void test_clamp_misc() {
@@ -215,25 +198,6 @@ void test_clamp_misc() {
   TEST_ASSERT_EQUAL(ALERT_BLINK_FAST, s.criticalLowMode);
   TEST_ASSERT_EQUAL(ALERT_PULSE, s.cautionMode);
   TEST_ASSERT_EQUAL(1, s.units);
-}
-
-void test_led_pin_validation() {
-  Settings s = defaults();
-  s.ledPin = 4;
-  settingsClamp(s);
-  TEST_ASSERT_EQUAL(4, s.ledPin);
-  s.ledPin = 5;  // OLED SDA
-  settingsClamp(s);
-  TEST_ASSERT_EQUAL(-1, s.ledPin);
-  s.ledPin = 9;  // BOOT button
-  settingsClamp(s);
-  TEST_ASSERT_EQUAL(-1, s.ledPin);
-  s.ledPin = 8;  // onboard LED
-  settingsClamp(s);
-  TEST_ASSERT_EQUAL(-1, s.ledPin);
-  s.ledPin = 77;
-  settingsClamp(s);
-  TEST_ASSERT_EQUAL(-1, s.ledPin);
 }
 
 void test_ap_password_rules() {
@@ -329,7 +293,6 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_classify_default_ranges);
   RUN_TEST(test_classify_follows_custom_ranges);
-  RUN_TEST(test_colors_per_zone);
   RUN_TEST(test_state_helpers);
   RUN_TEST(test_trend_dir);
   RUN_TEST(test_parse_timestamp);
@@ -338,13 +301,13 @@ int main(int, char**) {
   RUN_TEST(test_is_night_normal_window);
   RUN_TEST(test_is_night_wrapping_day_window);
   RUN_TEST(test_is_night_equal_means_never);
+  RUN_TEST(test_night_level_decision);
   RUN_TEST(test_default_settings);
   RUN_TEST(test_defaults_stable_under_clamp);
   RUN_TEST(test_clamp_poll_interval);
   RUN_TEST(test_clamp_keeps_ranges_ordered);
   RUN_TEST(test_clamp_brightness_never_dark);
   RUN_TEST(test_clamp_misc);
-  RUN_TEST(test_led_pin_validation);
   RUN_TEST(test_ap_password_rules);
   RUN_TEST(test_lluversion_default_when_empty);
   RUN_TEST(test_hostname_sanitized);

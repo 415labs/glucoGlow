@@ -24,12 +24,6 @@ inline bool isAlertState(State s) { return s != State::Unknown && s != State::No
 // mg/dL value + staleness -> state, using the ranges in settings (defaults 60 / 90 / 150 / 200).
 State classify(int mgdl, bool stale, const Settings& s);
 
-struct Rgb {
-  uint8_t r, g, b;
-};
-// Color for an external RGB LED: critical red, caution orange, normal green, stale blue, unknown off.
-Rgb colorFor(State s);
-
 // LibreLinkUp TrendArrow 1..5 (1 falling fast, 3 flat, 5 rising fast) -> -2..+2. False if unknown.
 bool trendDir(int arrow, int* dir);
 
@@ -41,5 +35,12 @@ int ageMinutes(int64_t nowEpoch, int64_t readingEpoch);
 
 // True if minuteOfDay falls in the night window. Day is [dayStart, nightStart), wrapping midnight.
 bool isNight(int minuteOfDay, uint16_t dayStartMin, uint16_t nightStartMin);
+
+// Display level: unknown clock => night (dim) level, so a freshly booted device never blazes at night.
+bool useNightLevel(bool timeValid, int minuteOfDay, uint16_t dayStartMin, uint16_t nightStartMin);
+
+// Display level: with an unknown clock use the dim night level, so a freshly booted device never
+// blazes in a dark bedroom.
+bool useNightLevel(bool timeValid, int minuteOfDay, uint16_t dayStartMin, uint16_t nightStartMin);
 
 float mgdlToMmol(int mgdl);

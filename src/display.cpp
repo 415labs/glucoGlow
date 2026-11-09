@@ -31,42 +31,29 @@ static const char* labelFor(State st) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Text screens
+// Text screens: instructions are drawn as large as they fit (about twice the old size)
 // ---------------------------------------------------------------------------------------------
 
-// Landscape (72x40): up to 4 text rows (baselines 8, 18, 28, 38). Rows too wide for the panel use a
-// smaller font. A leading '\x01' asks for the larger 6x10 font when the row fits.
-static void drawTextLandscape(const char* const lines[4]) {
-  u8g2.clearBuffer();
-  for (int i = 0; i < 4; i++) {
-    const char* t = lines[i];
-    if (!t || !*t) continue;
-    bool big = (t[0] == '\x01');
-    if (big) t++;
-    size_t n = strlen(t);
-    if (big && n * 6 <= 72) u8g2.setFont(u8g2_font_6x10_tr);
-    else u8g2.setFont(n * 5 <= 72 ? u8g2_font_5x7_tr : u8g2_font_4x6_tr);
-    u8g2.drawStr(0, 8 + 10 * i + (big ? 1 : 0), t);
-  }
-  u8g2.sendBuffer();
-}
-
 // Splits `t` into rows of at most maxCh characters, preferring to break at a space (dropped) or
-// right after '-' / '.'. Appends to rows[], returns the new row count.
-static int wrapInto(const char* t, int maxCh, char rows[][12], int maxRows, int count) {
+// right after '-' / '.'. Appends to rows[], returns the new row count (stops at maxRows).
+static const int ROW_LEN = 20;
+static int wrapInto(const char* t, int maxCh, char rows[][ROW_LEN], int maxRows, int count) {
   while (*t && count < maxRows) {
     int len = (int)strlen(t);
     if (len <= maxCh) {
-      strncpy(rows[count], t, 11);
-      rows[count][11] = 0;
+      strncpy(rows[count], t, ROW_LEN - 1);
+      rows[count][ROW_LEN - 1] = 0;
       return count + 1;
     }
     int cut = maxCh, skip = 0;
+    bool found = false;
     for (int p = maxCh; p >= 1; p--) {
-      if (t[p] == ' ') { cut = p; skip = 1; break; }
-      if (t[p - 1] == '-' || t[p - 1] == '.') { cut = p; break; }
+      if (t[p] == ' ') { cut = p; skip = 1; found = true; break; }
+      if ((t[p - 1] == '-' || t[p - 1] == '.') && len - p >= 2) { cut = p; found = true; break; }
     }
-    int n = cut < 11 ? cut : 11 - 1;
+    // A plain word or code with no separators (glow4821) splits evenly: glow|4821
+    if (!found && len <= 2 * maxCh && !strpbrk(t, " -.")) cut = (len + 1) / 2;
+    int n = cut < ROW_LEN - 1 ? cut : ROW_LEN - 1;
     memcpy(rows[count], t, n);
     rows[count][n] = 0;
     count++;
@@ -75,37 +62,34 @@ static int wrapInto(const char* t, int maxCh, char rows[][12], int maxRows, int 
   return count;
 }
 
-// Portrait (40x72): every line is wrapped to the narrow width. Uses the 5x7 font (8 chars, 8 rows)
-// when everything fits, otherwise the 4x6 font (10 chars, 9 rows).
-static void drawTextPortrait(const char* const lines[4]) {
-  static char rows[10][12];
-  struct Pass { const uint8_t* font; int maxCh, pitch, base, maxRows; };
-  const Pass passes[2] = {{u8g2_font_5x7_tr, 8, 9, 7, 8}, {u8g2_font_4x6_tr, 10, 8, 6, 9}};
-  int count = 0, used = 1;
-  for (int p = 0; p < 2; p++) {
-    count = 0;
-    bool fits = true;
-    for (int i = 0; i < 4; i++) {
-      const char* t = lines[i];
-      if (!t || !*t) continue;
-      if (t[0] == '\x01') t++;  // the large font does not fit 40 px
-      int before = count;
-      count = wrapInto(t, passes[p].maxCh, rows, passes[p].maxRows, count);
-      if (count - before == 0 || (count == passes[p].maxRows && (int)strlen(t) > passes[p].maxCh * (count - before)))
-        fits = false;
-    }
-    used = p;
-    if (fits || p == 1) break;
-  }
-  u8g2.clearBuffer();
-  u8g2.setFont(passes[used].font);
-  for (int i = 0; i < count; i++) u8g2.drawStr(0, passes[used].base + passes[used].pitch * i, rows[i]);
-  u8g2.sendBuffer();
-}
+// Fonts from large to small: the first one that holds all the text is used.
+struct TextTier { const uint8_t* font; int charW, base, pitch; };
+static const TextTier TIERS[] = {
+    {u8g2_font_8x13B_tr, 8, 10, 13},  // 9 chars x 3 rows (landscape), 5 x 5 (portrait)
+    {u8g2_font_6x10_tr, 6, 8, 10},    // 12 x 4, 6 x 7
+    {u8g2_font_5x7_tr, 5, 7, 9},      // 14 x 4, 8 x 8
+    {u8g2_font_4x6_tr, 4, 6, 8},      // 18 x 5, 10 x 9
+};
 
 static void drawText(const char* const lines[4], bool portrait) {
-  if (portrait) drawTextPortrait(lines);
-  else drawTextLandscape(lines);
+  static char rows[12][ROW_LEN];
+  const int W = portrait ? 40 : 72, H = portrait ? 72 : 40;
+  const int nTiers = (int)(sizeof TIERS / sizeof TIERS[0]);
+  int count = 0, used = nTiers - 1;
+  for (int ti = 0; ti < nTiers; ti++) {
+    const TextTier& tr = TIERS[ti];
+    int maxCh = W / tr.charW, maxRows = H / tr.pitch;
+    count = 0;
+    for (int i = 0; i < 4; i++)
+      if (lines[i] && *lines[i]) count = wrapInto(lines[i], maxCh, rows, 12, count);
+    used = ti;
+    if (count <= maxRows) break;
+    if (ti == nTiers - 1) count = maxRows;  // nothing smaller: drop the overflow
+  }
+  u8g2.clearBuffer();
+  u8g2.setFont(TIERS[used].font);
+  for (int i = 0; i < count; i++) u8g2.drawStr(0, TIERS[used].base + TIERS[used].pitch * i, rows[i]);
+  u8g2.sendBuffer();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -120,7 +104,6 @@ void Display::begin() {
 }
 
 void Display::applySettings(const Settings& s) {
-  led_.begin(s.ledPin);
   if (rotationInit_ && s.rotation == rotation_) return;
   rotation_ = s.rotation;
   rotationInit_ = true;
@@ -139,12 +122,10 @@ void Display::setContrastIfChanged(uint8_t c) {
   }
 }
 
-void Display::preview(State st, bool keepState, uint8_t contrast, uint8_t ledBrightness,
-                      uint16_t seconds) {
+void Display::preview(State st, bool keepState, uint8_t contrast, uint16_t seconds) {
   previewState_ = st;
   previewKeep_ = keepState;
   previewContrast_ = contrast < 1 ? 1 : contrast;
-  previewLed_ = ledBrightness < 1 ? 1 : ledBrightness;
   previewUntil_ = millis() + (uint32_t)seconds * 1000UL;
 }
 
@@ -301,13 +282,12 @@ void Display::update(const View& vIn, const Settings& s, bool timeValid, int min
     if (!v.haveValue) { v.haveValue = true; v.mgdl = 100; }
   }
 
-  // Day/night level. Never zero: the display and LED stay visible all night.
-  night_ = timeValid && ::isNight(minuteOfDay, s.dayStartMin, s.nightStartMin);
+  // Day/night level. Never zero: the display stays visible all night.
+  // Until the clock is known (just booted, no internet) use the dim night level.
+  night_ = useNightLevel(timeValid, minuteOfDay, s.dayStartMin, s.nightStartMin);
   uint8_t contrast = night_ ? s.nightContrast : s.dayContrast;
-  uint8_t ledLevel = night_ ? s.ledNight : s.ledDay;
   if (previewing) {
     contrast = previewContrast_;
-    ledLevel = previewLed_;
   }
 
   // Alert animation (only for non-normal states; normal stays calm)
@@ -326,11 +306,6 @@ void Display::update(const View& vIn, const Settings& s, bool timeValid, int min
     }
     default: break;
   }
-
-  // Optional RGB LED follows the same color / animation / schedule
-  Rgb col = colorFor(v.state);
-  float k = contentOn ? (ledLevel / 255.0f) * scale : 0.0f;
-  led_.set((uint8_t)lroundf(col.r * k), (uint8_t)lroundf(col.g * k), (uint8_t)lroundf(col.b * k));
 
   // Text screens (boot hints, setup instructions) replace the glucose view; no animation on text
   if (overlayActive()) {
