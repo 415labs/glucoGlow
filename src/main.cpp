@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
+#include <esp_system.h>
 #include <time.h>
 
 #include "display.h"
@@ -242,10 +243,15 @@ static void handleButton() {
 // Polling
 // ---------------------------------------------------------------------------------------------
 // First successful poll with an empty chart: pull the last ~12 h from the server (max 3 tries).
+static bool gAfterCrash = false;  // last reset was a crash/watchdog: skip the optional server backfill
+
 static void backfillHistory() {
   static uint8_t tries = 0;
 #ifndef MOCK_GLUCOSE
-  if (gHist.size() > 0 || tries >= 3 || !timeValid()) return;
+#ifdef NO_BACKFILL
+  return;  // diagnostic build: never ask the server for old data
+#endif
+  if (gAfterCrash || gHist.size() > 0 || tries >= 3 || !timeValid()) return;
   tries++;
   static LluHistPoint pts[200];
   int n = 0;
@@ -346,6 +352,10 @@ void setup() {
   // Native USB: give the serial monitor up to 3 s to attach so boot messages aren't lost.
   for (uint32_t t0 = millis(); !Serial && millis() - t0 < 3000;) delay(10);
   Serial.printf("\n[boot] glucoGlow v%s\n", FW_VERSION);
+  esp_reset_reason_t why = esp_reset_reason();
+  gAfterCrash = why == ESP_RST_PANIC || why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT ||
+                why == ESP_RST_WDT || why == ESP_RST_BROWNOUT;
+  Serial.printf("[boot] reset reason %d%s\n", (int)why, gAfterCrash ? " (CRASH)" : "");
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);  // off
   pinMode(PIN_BOOT, INPUT_PULLUP);
@@ -358,6 +368,12 @@ void setup() {
   gDisp.setHistory(&gHist);
   gDisp.showNow("glucoGlow", "v" FW_VERSION);
   delay(1000);
+  if (gAfterCrash) {
+    char code[16];
+    snprintf(code, sizeof code, "code %d", (int)why);
+    gDisp.showNow("CRASHED", "restarted", code);
+    delay(2500);
+  }
   gDisp.showNow("SETUP?", "Hold BOOT", "for 3 s");  // always shown at boot
   delay(2500);
 

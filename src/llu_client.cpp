@@ -155,21 +155,48 @@ bool LluClient::fetchConnections(LluReading& out, int& code) {
 bool LluClient::fetchGraph(LluHistPoint* pts, int cap, int& n, LluReading& out) {
   n = 0;
   if (!s_ || token_.isEmpty() || patientId_.isEmpty()) { setErr(out, "graph: not logged in"); return false; }
-  String resp;
-  int code = httpJson(false, "https://" + host_ + "/llu/connections/" + patientId_ + "/graph", "",
-                      token_, accountId_, s_->tlsInsecure, s_->lluVersion, resp);
+  // The graph answer is large (tens of kB). Never hold it in RAM: stream it straight through a
+  // filter. HTTP/1.0 keeps the server from using chunked encoding, which would corrupt the stream.
+  if (ESP.getFreeHeap() < 70000) { setErr(out, "graph: not enough free memory"); return false; }
+  WiFiClientSecure client;
+  if (s_->tlsInsecure) client.setInsecure();
+  else client.setCACertBundle(rootca_crt_bundle_start);
+  HTTPClient http;
+  http.setTimeout(10000);
+  http.setReuse(false);
+  http.useHTTP10(true);
+  if (!http.begin(client, "https://" + host_ + "/llu/connections/" + patientId_ + "/graph")) {
+    setErr(out, "graph: cannot connect");
+    return false;
+  }
+  http.addHeader("Accept", "application/json");
+  http.addHeader("cache-control", "no-cache");
+  http.addHeader("product", "llu.android");
+  http.addHeader("version", s_->lluVersion);
+  http.addHeader("Authorization", "Bearer " + token_);
+  if (accountId_.length()) http.addHeader("account-id", accountId_);
+  int code = http.GET();
   out.httpCode = code;
-  if (code != 200) { char m[80]; snprintf(m, sizeof m, "graph failed (HTTP %d)", code); setErr(out, m); return false; }
+  if (code != 200) {
+    http.end();
+    char m[80];
+    snprintf(m, sizeof m, "graph failed (HTTP %d)", code);
+    setErr(out, m);
+    return false;
+  }
   JsonDocument filter;  // keep only the three fields we need from each point
   filter["data"]["graphData"][0]["Value"] = true;
   filter["data"]["graphData"][0]["ValueInMgPerDl"] = true;
   filter["data"]["graphData"][0]["FactoryTimestamp"] = true;
   JsonDocument d;
-  if (deserializeJson(d, resp, DeserializationOption::Filter(filter))) {
+  Stream& body = http.getStream();
+  body.setTimeout(10000);
+  DeserializationError err = deserializeJson(d, body, DeserializationOption::Filter(filter));
+  http.end();
+  if (err) {
     setErr(out, "graph: unreadable response");
     return false;
   }
-  resp = "";
   for (JsonVariantConst g : d["data"]["graphData"].as<JsonArrayConst>()) {
     if (n >= cap) break;
     float v = g["ValueInMgPerDl"] | (g["Value"] | 0.0f);
