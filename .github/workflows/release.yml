@@ -27,7 +27,7 @@ jobs:
         with:
           path: ~/.platformio
           key: pio-${{ hashFiles('platformio.ini') }}
-      - run: pip install platformio
+      - run: pip install platformio esptool==4.8.1
 
       - name: Work out the version
         run: |
