@@ -54,7 +54,7 @@ jobs:
         run: |
           cat > site/manifest.json <<JSON
           {
-            "name": "GlucoGlow",
+            "name": "glucoGlow",
             "version": "${VERSION}",
             "new_install_prompt_erase": false,
             "builds": [

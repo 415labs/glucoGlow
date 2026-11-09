@@ -6,7 +6,7 @@
 static const char INDEX_HTML[] PROGMEM = R"HTML(<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GlucoGlow</title>
+<title>glucoGlow</title>
 <style>
 :root{color-scheme:light dark;--bd:#8884;--ac:#2a7;--crit:#d32f2f;--caut:#ef8a00;--ok:#2e9e4f;--stale:#3b6fd6;--unk:#888}
 body{font:15px/1.4 system-ui,sans-serif;max-width:640px;margin:0 auto;padding:12px}
@@ -35,7 +35,7 @@ button.d{background:var(--crit)}
 #msg{min-height:1.4em;font-weight:600}
 .err{color:var(--crit)}.good{color:var(--ok)}
 </style></head><body>
-<h1>GlucoGlow <small id="ver" style="display:inline"></small></h1>
+<h1>glucoGlow <small id="ver" style="display:inline"></small></h1>
 <div id="banner"></div>
 <fieldset id="statusBox"><legend>Status</legend><div id="st"></div></fieldset>
 <fieldset id="chartBox" style="display:none"><legend>Last 12 hours</legend><canvas id="ch" style="width:100%;height:170px"></canvas><small id="chNote"></small></fieldset>

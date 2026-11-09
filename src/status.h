@@ -8,7 +8,7 @@
 #endif
 
 // Name of the on-demand setup WiFi network (password is generated per device and shown on the display)
-#define AP_SSID "GlucoGlow-setup"
+#define AP_SSID "glucoGlow-setup"
 
 struct DeviceStatus {
   bool provisioning = false; // setup WiFi is on because there is no working WiFi connection

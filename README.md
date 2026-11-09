@@ -1,4 +1,4 @@
-# GlucoGlow
+# glucoGlow
 
 Bedside glucose display for the **ESP32-C3 0.42" OLED** board. Successor of [glucoLed2](https://github.com/415labs/glucoLed2) (Raspberry Pi + LED), rebuilt as a standalone device: it polls LibreLinkUp, shows the value, trend arrow and age of the reading on the built-in 72x40 OLED, and stays dim (but visible) at night. Everything is configured from a web app served by the device itself.
 
@@ -33,7 +33,7 @@ The device keeps showing glucose while you change settings.
 
 1. **Hold the BOOT button for 3 seconds.** The screen counts down ("KEEP HOLD... in 3 s").
 2. The screen then shows, one page at a time (it repeats):
-   - **1/3** the WiFi to join: `GlucoGlow-setup`
+   - **1/3** the WiFi to join: `glucoGlow-setup`
    - **2/3** the WiFi password: `glow` + 4 digits, generated per device
    - **3/3** the address to open: `192.168.4.1`
 3. Join that WiFi from a phone or PC, enter the password, open `http://192.168.4.1`. Every setting is there.
@@ -71,7 +71,7 @@ Board assumptions (confirm on yours): OLED SDA = GPIO5, SCL = GPIO6; BOOT = GPIO
 
 ## First-time setup
 1. Power the board. With no WiFi saved it starts setup mode by itself and walks you through it on the screen.
-2. Join `GlucoGlow-setup` with the password shown, open `http://192.168.4.1`.
+2. Join `glucoGlow-setup` with the password shown, open `http://192.168.4.1`.
 3. Enter your WiFi and your **LibreLinkUp** email/password (a *follower* account that has the sensor data shared with it), press **Save**, then **Reboot**.
 4. Afterwards open `http://glucoglow.local` (or the IP shown by tapping BOOT). **Test LibreLinkUp login** checks credentials without saving. The **Preview** box shows each zone on the display.
 

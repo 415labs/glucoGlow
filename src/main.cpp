@@ -345,7 +345,7 @@ void setup() {
   Serial.begin(115200);
   // Native USB: give the serial monitor up to 3 s to attach so boot messages aren't lost.
   for (uint32_t t0 = millis(); !Serial && millis() - t0 < 3000;) delay(10);
-  Serial.printf("\n[boot] GlucoGlow v%s\n", FW_VERSION);
+  Serial.printf("\n[boot] glucoGlow v%s\n", FW_VERSION);
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);  // off
   pinMode(PIN_BOOT, INPUT_PULLUP);
@@ -356,7 +356,7 @@ void setup() {
   gDisp.begin();
   gDisp.applySettings(gSet);
   gDisp.setHistory(&gHist);
-  gDisp.showNow("GlucoGlow", "v" FW_VERSION);
+  gDisp.showNow("glucoGlow", "v" FW_VERSION);
   delay(1000);
   gDisp.showNow("SETUP?", "Hold BOOT", "for 3 s");  // always shown at boot
   delay(2500);
