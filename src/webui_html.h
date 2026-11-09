@@ -73,10 +73,10 @@ const SECTIONS=[
  {k:'normalHigh',l:'Normal range ends at',t:'number',min:31,max:350,bar:1},
  {k:'criticalHigh',l:'Critical high: above',t:'number',min:100,max:450,bar:1},
  {k:'staleMin',l:'No new data after (minutes)',t:'number',min:5,max:120,h:'Shown as stale (blue)'}]},
-{n:'Alert patterns',intro:'Critical animates only the trend arrow and no/stale data only the STALE text; the number stays steady. Caution pulses the whole screen. On the OLED a pulse is a blink that stays on most of the time.',f:[
+{n:'Alert patterns',intro:'Only one element animates, never the whole screen, and the number stays steady: the trend arrow for critical, the LOW / HIGH label for caution, the STALE label for no / stale data. On the OLED a pulse is a blink that stays on most of the time.',f:[
  {k:'criticalLowMode',l:'Critical low (red): arrow',t:'select',o:MODES},
  {k:'criticalHighMode',l:'Critical high (red): arrow',t:'select',o:MODES},
- {k:'cautionMode',l:'Caution, low or high (orange): whole screen',t:'select',o:MODES},
+ {k:'cautionMode',l:'Caution, low or high (orange): label',t:'select',o:MODES},
  {k:'staleMode',l:'No / stale data (blue): STALE text',t:'select',o:MODES}]},
 {n:'Brightness',intro:'The display is never switched off: night is dim but still visible. Move a slider to preview it on the device.',f:[
  {k:'dayStartMin',l:'Day starts',t:'time'},

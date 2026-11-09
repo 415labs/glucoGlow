@@ -51,7 +51,7 @@ Once the device is on your home WiFi you can also use `http://glucoglow.local` (
 ## What it does
 - Polls LibreLinkUp every **60 s by default** (30-900 s in the web app).
 - Shows glucose (mg/dL or mmol/L), trend arrow and minutes since the reading.
-- Alert pattern per zone (steady, blink slow/fast, slow/fast pulse, 3 blinks + pause). Critical animates only the **arrow** (default: fast pulse), no/stale data animates only the **STALE** text (default: slow pulse), caution pulses the whole screen. The number never blinks. On the monochrome OLED a pulse is a blink that stays on most of the time.
+- Alert pattern per zone (steady, blink slow/fast, slow/fast pulse, 3 blinks + pause). Critical animates only the **arrow** (default: fast pulse), caution animates only the **LOW / HIGH** label (default: slow pulse), no/stale data animates only the **STALE** text (default: slow pulse). The whole screen and the number never blink. On the monochrome OLED a pulse is a blink that stays on most of the time.
 - The onboard blue LED is always off.
 
 ## Install (no tools needed)

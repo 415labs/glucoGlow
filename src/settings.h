@@ -11,8 +11,8 @@ enum AlertMode : uint8_t {
   ALERT_PULSE = 3,
   ALERT_TRIPLE = 4,  // 3 quick blinks, then a pause (port of glucoLed2 "issue" pattern)
   ALERT_PULSE_FAST = 5
-  // PULSE = slow pulse. Critical and stale patterns animate only the arrow / the STALE text;
-  // the caution pattern animates the whole screen.
+  // PULSE = slow pulse. Patterns never animate the whole screen, only one element: the arrow
+  // (critical), the LOW / HIGH label (caution) or the STALE label (stale).
 };
 
 // Bump when a default changes that existing devices should pick up.
@@ -88,7 +88,7 @@ inline void settingsDefaults(Settings& s) {
   s.ver = SETTINGS_VERSION;
   s.criticalLowMode = ALERT_PULSE_FAST;   // arrow only
   s.criticalHighMode = ALERT_PULSE_FAST;  // arrow only
-  s.cautionMode = ALERT_PULSE;            // whole screen
+  s.cautionMode = ALERT_PULSE;            // LOW / HIGH label only
   s.staleMode = ALERT_PULSE;              // STALE text only, slow
   s.dayStartMin = 7 * 60;
   s.nightStartMin = 22 * 60;

@@ -214,9 +214,11 @@ void Display::drawView(const View& v, const Settings& s, int sx, int sy, bool el
   const char* label = labelFor(v.state);
   const bool crit = v.state == State::CriticalLow || v.state == State::CriticalHigh;
   const bool arrowShown = show && s.showArrow && v.trendKnown;
-  // Critical: the arrow animates (the label if there is no arrow). Stale: the STALE label.
+  // Critical: the arrow animates (the label if there is no arrow). Caution: the LOW / HIGH label.
+  // Stale: the STALE label.
   const bool drawArrowNow = arrowShown && (!crit || elemOn);
-  const bool labelAnimated = (crit && !arrowShown) || stale;
+  const bool caution = v.state == State::CautionLow || v.state == State::CautionHigh;
+  const bool labelAnimated = (crit && !arrowShown) || caution || stale;
   const bool drawLabelNow = *label && (!labelAnimated || elemOn);
 
   if (!portrait_) {
@@ -312,29 +314,9 @@ void Display::update(const View& vIn, const Settings& s, bool timeValid, int min
     contrast = previewContrast_;
   }
 
-  // Alert animation. Caution animates the whole screen; critical animates only the arrow and
-  // stale only the STALE text (the number stays steady). Normal stays calm.
-  const bool wholeScreen = v.state == State::CautionLow || v.state == State::CautionHigh;
-  const AlertMode mode = modeFor(v.state, s);
-  const bool elemOn = elementPhase(mode, now);
-  bool contentOn = true;
-  float scale = 1.0f;
-  if (wholeScreen) switch (mode) {
-    case ALERT_BLINK_SLOW: contentOn = ((now / 750) % 2) == 0; break;
-    case ALERT_BLINK_FAST: contentOn = ((now / 150) % 2) == 0; break;
-    case ALERT_PULSE:
-      scale = 0.3f + 0.7f * (sinf(now / 1000.0f * 2.0f * (float)M_PI / 3.0f) + 1.0f) / 2.0f;
-      break;
-    case ALERT_PULSE_FAST:
-      scale = 0.3f + 0.7f * (sinf(now / 1000.0f * 2.0f * (float)M_PI / 0.8f) + 1.0f) / 2.0f;
-      break;
-    case ALERT_TRIPLE: {
-      uint32_t t = now % 2600;
-      contentOn = t < 600 && (t % 200) < 100;
-      break;
-    }
-    default: break;
-  }
+  // Alert animation: never the whole screen, only one element. Critical animates the arrow,
+  // caution the LOW / HIGH label, stale the STALE label. The number always stays steady.
+  const bool elemOn = elementPhase(modeFor(v.state, s), now);
 
   // Text screens (boot hints, setup instructions) replace the glucose view; no animation on text
   if (overlayActive()) {
@@ -344,14 +326,7 @@ void Display::update(const View& vIn, const Settings& s, bool timeValid, int min
     return;
   }
 
-  int c = (int)lroundf(contrast * scale);
-  if (c < 1) c = 1;
-  setContrastIfChanged((uint8_t)c);
-  if (!contentOn) {
-    u8g2.clearBuffer();
-    u8g2.sendBuffer();
-    return;
-  }
+  setContrastIfChanged(contrast);
   // Chart page: 4 s out of every 12 s, only while glucose is normal/caution (alerts stay on the number)
   if (s.showChart && hist_ && !previewing && v.haveValue &&
       (v.state == State::Normal || v.state == State::CautionLow || v.state == State::CautionHigh) &&
