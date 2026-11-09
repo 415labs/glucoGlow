@@ -192,20 +192,54 @@ static void toggleSetupMode() {
   }
 }
 
+// The poll (HTTPS login + download) blocks the main loop for seconds. The button is therefore also
+// watched by an interrupt that records when it went down and up, so a 3 s hold is recognised
+// even when the loop was busy, and polls are not started while the button is held.
+static volatile uint32_t gIsrDownMs = 0, gIsrUpMs = 0;
+static volatile uint32_t gIsrSeq = 0;  // counts presses
+static volatile uint32_t gIsrLastEdge = 0;
+static bool gBtnDown = false;
+
+static void IRAM_ATTR onButtonEdge() {
+  uint32_t n = millis();
+  if (n - gIsrLastEdge < 25) return;  // contact bounce
+  gIsrLastEdge = n;
+  if (digitalRead(PIN_BOOT) == LOW) {
+    gIsrDownMs = n;
+    gIsrSeq = gIsrSeq + 1;
+  } else {
+    gIsrUpMs = n;
+  }
+}
+
 static void handleButton() {
   static bool down = false;
   static bool toggled = false;
   static uint32_t t0 = 0;
+  static uint32_t handledSeq = 0;
   static uint8_t infoPage = 0;
   uint32_t now = millis();
   bool pressed = digitalRead(PIN_BOOT) == LOW;
   if (!down && now >= gBusyUntil) infoPage = 0;  // info screens timed out: next tap starts over
 
+  uint32_t seq = gIsrSeq, isrDown = gIsrDownMs, isrUp = gIsrUpMs;
+  if (!down && !pressed && seq != handledSeq) {
+    // A whole press happened while the loop was busy (e.g. during a poll).
+    handledSeq = seq;
+    if (isrUp - isrDown < 0x80000000UL && isrUp - isrDown >= HOLD_MS && now - isrUp < 10000) {
+      toggleSetupMode();
+      gBtnDown = false;
+      return;
+    }
+  }
   if (pressed && !down) {
     down = true;
     toggled = false;
-    t0 = now;
+    handledSeq = seq;
+    // Count from the real press, even if the loop only noticed it later.
+    t0 = (seq != 0 && now - isrDown < 60000UL) ? isrDown : now;
   }
+  gBtnDown = down;
   if (down && pressed && !toggled && now - t0 >= SHORT_PRESS_MAX_MS) {
     uint32_t held = now - t0;
     if (held >= HOLD_MS) {
@@ -219,10 +253,13 @@ static void handleButton() {
     }
   }
   if (down && !pressed) {
-    uint32_t held = now - t0;
+    uint32_t held = (isrUp - t0 < 0x80000000UL && isrUp >= t0) ? isrUp - t0 : now - t0;
     down = false;
+    gBtnDown = false;
     if (!toggled) {
-      if (held >= 30 && held < SHORT_PRESS_MAX_MS) {  // a tap (ignores contact bounce)
+      if (held >= HOLD_MS) {  // the hold completed while the loop was busy
+        toggleSetupMode();
+      } else if (held >= 30 && held < SHORT_PRESS_MAX_MS) {  // a tap (ignores contact bounce)
         infoPage = (uint8_t)((infoPage + 1) % 4);
         if (infoPage == 0) {
           gDisp.clearOverlay();
@@ -359,6 +396,7 @@ void setup() {
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);  // off
   pinMode(PIN_BOOT, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIN_BOOT), onButtonEdge, CHANGE);
 
   settingsLoad(gSet);
   if (settingsEnsureApPass(gSet)) settingsSave(gSet);  // first boot: generate the setup WiFi password
@@ -405,7 +443,7 @@ void loop() {
 
   uint32_t now = millis();
   bool staUp = !gProvisioning && WiFi.status() == WL_CONNECTED;
-  if (staUp && (gPollNow || (int32_t)(now - gNextPoll) >= 0)) {
+  if (staUp && !gBtnDown && (gPollNow || (int32_t)(now - gNextPoll) >= 0)) {
     gPollNow = false;
     doPoll();  // blocking up to ~20 s in the worst case; the web app waits meanwhile
     now = millis();
