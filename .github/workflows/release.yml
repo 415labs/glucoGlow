@@ -1,0 +1,96 @@
+# Builds the firmware when you push a version tag (e.g. v0.3.0), attaches it to a GitHub Release
+# and publishes the one-click install page (docs/) on GitHub Pages.
+name: Release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio
+
+      - name: Work out the version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.0-dev"; fi
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+
+      - name: Build the firmware
+        run: |
+          export PLATFORMIO_BUILD_FLAGS="-DFW_VERSION=\\\"${VERSION}\\\""
+          pio run -e esp32-c3-devkitm-1
+
+      - name: Merge into ONE file that is flashed at address 0
+        run: |
+          B=.pio/build/esp32-c3-devkitm-1
+          BOOT_APP0=$(find ~/.platformio/packages -name boot_app0.bin | head -n 1)
+          mkdir -p site
+          python -m esptool --chip esp32c3 merge_bin \
+            -o site/glucoglow-merged.bin \
+            --flash_mode dio --flash_freq 80m --flash_size 4MB \
+            0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0xe000 "$BOOT_APP0" 0x10000 $B/firmware.bin
+          ls -l site
+
+      - name: Write the install manifest and copy the install page
+        run: |
+          cat > site/manifest.json <<JSON
+          {
+            "name": "GlucoGlow",
+            "version": "${VERSION}",
+            "new_install_prompt_erase": false,
+            "builds": [
+              {
+                "chipFamily": "ESP32-C3",
+                "parts": [ { "path": "glucoglow-merged.bin", "offset": 0 } ]
+              }
+            ]
+          }
+          JSON
+          cp docs/* site/
+          sed -i "s/__VERSION__/${VERSION}/g" site/index.html
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: glucoglow-${{ env.VERSION }}
+          path: site/glucoglow-merged.bin
+
+      - name: Attach to the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: site/glucoglow-merged.bin
+          generate_release_notes: true
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Install GlucoGlow</title>
+<meta name="description" content="Flash GlucoGlow, a bedside glucose display, onto an ESP32-C3 OLED board from your browser. Nothing to install.">
+<script type="module" src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module"></script>
+<style>
+:root{--bg:#f6f7f4;--fg:#1b2420;--mut:#5d6b64;--card:#fff;--bd:#dfe5e0;--ac:#1f9d55;--glow:#2ee27a55;--warn:#fff4e0;--warnbd:#f0c36d}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1210;--fg:#e6eee9;--mut:#93a39a;--card:#141b17;--bd:#24302a;--ac:#34d17a;--glow:#34d17a44;--warn:#2a2210;--warnbd:#6b5420}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:640px;margin:0 auto;padding:28px 16px 48px}
+h1{font-size:34px;margin:0 0 4px;letter-spacing:-.5px}
+h1 span{color:var(--ac);text-shadow:0 0 18px var(--glow)}
+.sub{color:var(--mut);margin:0 0 22px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px 18px;margin:16px 0}
+.card h2{font-size:17px;margin:0 0 8px}
+ol{padding-left:20px;margin:6px 0}
+li{margin:6px 0}
+.go{text-align:center;padding:26px 16px}
+esp-web-install-button button{font:600 17px system-ui,sans-serif;background:var(--ac);color:#04140b;border:0;border-radius:10px;padding:14px 26px;cursor:pointer;box-shadow:0 0 22px var(--glow)}
+.ver{color:var(--mut);font-size:13px;margin-top:10px}
+.note{background:var(--warn);border:1px solid var(--warnbd);border-radius:12px;padding:12px 14px;font-size:14px}
+details{margin:8px 0}summary{cursor:pointer;font-weight:600}
+a{color:var(--ac)}
+small,.small{color:var(--mut);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<h1>Gluco<span>Glow</span></h1>
+<p class="sub">A dim, bedside glucose display for the ESP32-C3 0.42&Prime; OLED board. Flash it from this page; there is nothing to install.</p>
+
+<div class="card go">
+  <esp-web-install-button manifest="manifest.json">
+    <button slot="activate">Connect &amp; install</button>
+    <span slot="unsupported">This browser can't flash devices. Please open this page in <b>Chrome</b>, <b>Edge</b> or <b>Brave</b> on a Windows, Mac or Linux computer.</span>
+    <span slot="not-allowed">Flashing needs a secure (https) page. Please use the official link from the project page.</span>
+  </esp-web-install-button>
+  <div class="ver">Firmware version __VERSION__</div>
+</div>
+
+<div class="card">
+  <h2>Steps</h2>
+  <ol>
+    <li>Use <b>Chrome, Edge or Brave</b> on a computer (not Safari, Firefox or a phone).</li>
+    <li>Plug the board into your computer with a USB cable that carries <b>data</b> (some cables only charge).</li>
+    <li>Click <b>Connect &amp; install</b>, choose the USB device in the list (often named <i>USB JTAG/serial</i> or <i>USB Serial</i>), then click <b>Install</b>.</li>
+    <li>Wait about 30 seconds. When it finishes the board restarts and its screen shows <b>SETUP HOW-TO</b>.</li>
+    <li>Follow the on-screen steps: join the <b>GlucoGlow-setup</b> WiFi with the password shown on the screen, then enter your home WiFi and LibreLinkUp details in the page that opens.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>If the board isn't listed</h2>
+  <ol>
+    <li>Unplug it. <b>Hold the BOOT button</b>, plug it in while holding, then release. Click Connect again.</li>
+    <li>Try another USB cable or port; avoid hubs.</li>
+    <li>Close other programs that might use the port (Arduino IDE, serial monitors).</li>
+  </ol>
+  <details><summary>Updating later</summary>
+    <p class="small">Run this page again; your settings (WiFi, LibreLinkUp login, ranges) are kept. To start fresh, use <b>Factory reset</b> in the device's web page.</p>
+  </details>
+</div>
+
+<div class="note"><b>Not a medical device.</b> GlucoGlow is a convenience display. It uses the unofficial LibreLinkUp service, which can change or stop working without notice. Always keep your official CGM alerts turned on, and do not use this to make treatment decisions.</div>
+
+<p class="small" style="margin-top:20px">Open source (MIT): <a href="https://github.com/415labs/glucoglow">github.com/415labs/glucoglow</a></p>
+</main>
+</body>
+</html>
