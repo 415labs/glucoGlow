@@ -37,6 +37,16 @@ static bool gTsOk = false;
 static int64_t gTsUtc = 0;
 static uint32_t gRecvMs = 0;
 
+// Self-healing: if no reading arrives for a long time because of a network problem, recover by
+// reconnecting WiFi, forgetting the login, and as a last resort restarting (the cause can be a
+// WiFi link that never came back or a fragmented heap that can no longer open a TLS connection).
+static const uint32_t WD_MAGIC = 0x474C4F57;
+static RTC_NOINIT_ATTR uint32_t gWdMagic;
+static RTC_NOINIT_ATTR uint32_t gWdCount;  // consecutive watchdog restarts (survives a restart)
+static uint32_t gLastOkMs = 0;             // last successful poll (boot counts as the start)
+static bool gNetFail = false;              // last poll failed at network/TLS level, not on credentials
+static uint32_t gWifiDownSince = 0, gLastWifiKick = 0;
+
 static uint32_t gNextPoll = 0;
 static bool gPollNow = false;
 static uint32_t gFailCount = 0;
@@ -48,6 +58,7 @@ static uint32_t gApStartMs = 0;
 static uint32_t gApBusyMs = 0;      // last time a client was connected to the setup WiFi
 static uint8_t gLastSlot = 255;
 static uint32_t gBusyUntil = 0;     // button-driven screens own the display until then
+static bool busyAt(uint32_t now) { return (int32_t)(gBusyUntil - now) > 0; }  // wrap-safe
 
 static bool timeValid() { return time(nullptr) > 1700000000; }
 
@@ -144,7 +155,7 @@ static void showSetupPage(int page, uint32_t ms) {
 // Called every render tick while the setup WiFi is on: rotates instruction screens and the glucose view.
 static void updateSetupScreens(const View& v) {
   if (!gSetupAp) return;
-  if (millis() < gBusyUntil) return;  // a button-driven screen is showing
+  if (busyAt(millis())) return;  // a button-driven screen is showing
   if (isCritical(v.state)) {          // never hide a critical glucose alert behind instructions
     gDisp.clearOverlay();
     gLastSlot = 255;
@@ -220,7 +231,7 @@ static void handleButton() {
   static uint8_t infoPage = 0;
   uint32_t now = millis();
   bool pressed = digitalRead(PIN_BOOT) == LOW;
-  if (!down && now >= gBusyUntil) infoPage = 0;  // info screens timed out: next tap starts over
+  if (!down && !busyAt(now)) infoPage = 0;  // info screens timed out: next tap starts over
 
   uint32_t seq = gIsrSeq, isrDown = gIsrDownMs, isrUp = gIsrUpMs;
   if (!down && !pressed && seq != handledSeq) {
@@ -337,11 +348,18 @@ static void doPoll() {
     backfillHistory();  // before adding the live reading, so older points go in first
     gHist.add((int32_t)(millis() / 1000), (uint16_t)r.mgdl);
     gFailCount = 0;
+    gLastOkMs = millis();
+    gNetFail = false;
+    gWdCount = 0;
     gSt.lastOk = true;
     gSt.lastErr[0] = 0;
     Serial.printf("[poll] %d mg/dL, trend %d\n", r.mgdl, r.trendArrow);
   } else {
     gFailCount++;
+    gNetFail = r.httpCode <= 0;
+    if (gFailCount == 2) gLlu.invalidate();  // maybe the login went bad: start from a fresh one
+    Serial.printf("[poll] free heap %u, largest block %u\n", (unsigned)ESP.getFreeHeap(),
+                  (unsigned)ESP.getMaxAllocHeap());
     gSt.lastOk = false;
     strncpy(gSt.lastErr, r.err, sizeof gSt.lastErr - 1);
     Serial.printf("[poll] failed: %s (HTTP %d)\n", r.err, r.httpCode);
@@ -393,6 +411,11 @@ void setup() {
   gAfterCrash = why == ESP_RST_PANIC || why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT ||
                 why == ESP_RST_WDT || why == ESP_RST_BROWNOUT;
   Serial.printf("[boot] reset reason %d%s\n", (int)why, gAfterCrash ? " (CRASH)" : "");
+  if (gWdMagic != WD_MAGIC || why == ESP_RST_POWERON) {
+    gWdMagic = WD_MAGIC;
+    gWdCount = 0;
+  }
+  gLastOkMs = millis();
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);  // off
   pinMode(PIN_BOOT, INPUT_PULLUP);
@@ -434,6 +457,33 @@ void setup() {
   gWeb.setHistory(&gHist);
 }
 
+// Runs every loop. Never acts while someone is using the setup WiFi or holding BOOT.
+static void selfHeal(uint32_t now) {
+  if (gProvisioning || gBtnDown || !gSet.wifiSsid[0]) return;
+  bool wifiUp = WiFi.status() == WL_CONNECTED;
+  if (wifiUp) {
+    gWifiDownSince = 0;
+  } else {
+    if (!gWifiDownSince) gWifiDownSince = now;
+    if (now - gWifiDownSince > 30000UL && now - gLastWifiKick > 30000UL) {
+      gLastWifiKick = now;  // the automatic reconnect did not work: join again by hand
+      Serial.println("[wifi] still down, reconnecting");
+      WiFi.disconnect(false);
+      WiFi.begin(gSet.wifiSsid, gSet.wifiPass);
+    }
+  }
+  if (!gSet.lluEmail[0]) return;
+  uint32_t minutes = 20UL + 20UL * (gWdCount > 5 ? 5 : gWdCount);  // 20, 40 ... 120 min
+  bool setupInUse = gSetupAp && WiFi.softAPgetStationNum() > 0;
+  if (!setupInUse && (!wifiUp || gNetFail) && now - gLastOkMs > minutes * 60000UL) {
+    Serial.printf("[watchdog] no reading for %u min (network problem): restarting\n",
+                  (unsigned)minutes);
+    gWdCount = gWdCount + 1;
+    delay(200);
+    ESP.restart();
+  }
+}
+
 void loop() {
   static uint32_t lastRender = 0;
   static uint32_t lastHint = 0;
@@ -442,6 +492,7 @@ void loop() {
   handleButton();
 
   uint32_t now = millis();
+  selfHeal(now);
   bool staUp = !gProvisioning && WiFi.status() == WL_CONNECTED;
   if (staUp && !gBtnDown && (gPollNow || (int32_t)(now - gNextPoll) >= 0)) {
     gPollNow = false;
@@ -477,7 +528,7 @@ void loop() {
 
 #ifndef MOCK_GLUCOSE
     // Nothing configured yet: remind how to get to the settings every 20 s
-    if (!gSetupAp && !gSet.lluEmail[0] && now >= gBusyUntil && now - lastHint > 20000) {
+    if (!gSetupAp && !gSet.lluEmail[0] && !busyAt(now) && now - lastHint > 20000) {
       lastHint = now;
       gDisp.overlay("SET ME UP", "Hold BOOT", "for 3 s", "", 5000);
     }

@@ -102,6 +102,9 @@ On the tested board the setup network was invisible at the default (maximum) tra
 - Arrow and text layout on the 72x40 panel, and the text screens' line fit.
 
 
+## Self-healing
+If readings stop because of a network problem the device recovers on its own: it rejoins WiFi if the link stays down for 30 s, starts from a fresh LibreLinkUp login after 2 failed polls, and as a last resort restarts itself after 20 minutes without a reading (waiting longer after repeated restarts, up to 2 h). It never restarts for wrong credentials or a LibreLinkUp-side error, and never while the setup WiFi is in use or BOOT is held. The web app's Status box shows the last poll result and free memory; the serial monitor logs `[wifi]`, `[poll]` and `[watchdog]` lines.
+
 ## Releasing (maintainers)
 Push a version tag and GitHub Actions builds the firmware, merges it into one `glucoglow-merged.bin`, attaches it to a GitHub Release and publishes the install page (`docs/`) on GitHub Pages:
 
