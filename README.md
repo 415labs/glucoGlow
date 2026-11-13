@@ -29,24 +29,13 @@ The web app shows a chart of the last 12 hours (one point per 5 minutes) with yo
 Mount the board however fits your shelf: in the web app, **Display → Screen rotation**, choose 0, 90, 180 or 270 (degrees clockwise) and **Save**. It applies immediately. 90 and 270 turn the 72x40 panel into a tall 40x72 screen with its own layout (value on top, arrow, label, age below). If the board is upside down, the setup instructions are too until you set the rotation, so read them upside down once or turn the board for the first setup.
 
 ## Setup mode (change any setting at any time)
-The device keeps showing glucose while you change settings.
+**Hold BOOT for 3 seconds** (the screen counts down). The display then walks you through three steps, in large text, and repeats until you finish:
 
-1. **Hold the BOOT button for 3 seconds.** The screen counts down ("KEEP HOLD... in 3 s").
-2. The screen then shows, one page at a time (it repeats):
-   - **1/3** the WiFi to join: `glucoGlow-setup`
-   - **2/3** the WiFi password: `glow` + 4 digits, generated per device
-   - **3/3** the address to open: `192.168.4.1`
-3. Join that WiFi from a phone or PC, enter the password, open `http://192.168.4.1`. Every setting is there.
-4. Hold BOOT for 3 s again to leave setup mode. It also switches off by itself after 15 minutes without a connected device.
+1. **Join the WiFi**: `1/3 JOIN` shows the name `glucoGlow-setup`, `1/3 PASS` shows its password (`glow` + 4 digits). Pick that network on your phone or computer and type the password.
+2. **Open the page**: `2/3 OPEN browser`, then `2/3 URL 192.168.4.1`. Type that address in a browser (it often opens by itself).
+3. **Enter your details**: `3/3 ENTER WiFi & LibreLink`, then `3/3 THEN tap Save`. Fill in your home WiFi and LibreLinkUp login and press Save.
 
-Other help on the device:
-- At every power-up the screen shows "Hold BOOT 3 s, then follow the screens".
-- **Tap BOOT** to cycle info screens: the IP address, the `glucoglow.local` name, and the setup how-to.
-- If nothing is configured yet, the screen reminds you every 20 s how to start setup mode.
-- If the saved WiFi can't be reached at boot (or none is saved), setup mode starts automatically and stays on until WiFi works. If the router was just slow to start, the device reboots and retries after 2 minutes with nobody connected.
-- A critical low/high alert is never hidden behind setup screens.
-
-Once the device is on your home WiFi you can also use `http://glucoglow.local` (or its IP) any time without setup mode.
+Hold BOOT for 3 seconds again to leave setup mode; it also switches itself off after 15 minutes with nobody connected. A critical glucose value never skips the instructions: the live glucose screen takes one slot at the end of each round. Tap BOOT to see the web address of the running device.
 
 ## What it does
 - Polls LibreLinkUp every **60 s by default** (30-900 s in the web app).
@@ -101,6 +90,9 @@ On the tested board the setup network was invisible at the default (maximum) tra
 - The setup WiFi running alongside your home WiFi was not tested on hardware.
 - Arrow and text layout on the 72x40 panel, and the text screens' line fit.
 
+
+## Welcome screen
+On power-up the display plays a short animation (a spinning gem, then "Welcome to glucoGlow" and the version) before the normal start-up screens.
 
 ## Self-healing
 If readings stop because of a network problem the device recovers on its own: it rejoins WiFi if the link stays down for 30 s, starts from a fresh LibreLinkUp login after 2 failed polls, and as a last resort restarts itself after 20 minutes without a reading (waiting longer after repeated restarts, up to 2 h). It never restarts for wrong credentials or a LibreLinkUp-side error, and never while the setup WiFi is in use or BOOT is held. The web app's Status box shows the last poll result and free memory; the serial monitor logs `[wifi]`, `[poll]` and `[watchdog]` lines.

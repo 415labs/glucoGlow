@@ -18,7 +18,7 @@ static const int PIN_BOOT = 9;  // BOOT button: tap = info screens, hold 3 s = s
 
 static const uint32_t SHORT_PRESS_MAX_MS = 500;
 static const uint32_t HOLD_MS = 3000;
-static const uint32_t PAGE_MS = 4000;                       // each setup instruction screen
+static const uint32_t PAGE_MS = 3500;                       // each setup instruction screen
 static const uint32_t SETUP_IDLE_MS = 15UL * 60UL * 1000UL;  // setup WiFi turns off after 15 min w/o clients
 static const uint32_t PROVISION_RETRY_MS = 120UL * 1000UL;   // no WiFi + nobody connected: reboot and retry
 
@@ -138,34 +138,35 @@ static void stopSetupAp() {
   Serial.println("[setup] access point stopped");
 }
 
-// Setup instruction screens, drawn large: join the WiFi, type the password, open the browser.
-// (4th page while provisioning: what to do in the browser.)
+// Setup instruction screens, drawn large. Three steps, each one screen or two:
+//   1  join the setup WiFi (name, then password)   2  open the address in a browser
+//   3  fill in WiFi + LibreLink and save
+static const uint8_t SETUP_PAGES = 6;
+
 static void showSetupPage(int page, uint32_t ms) {
-  if (page == 0) {
-    gDisp.overlay("1/3 JOIN", AP_SSID, "", "", ms);
-  } else if (page == 1) {
-    gDisp.overlay("2/3 PASS", gSet.apPass, "", "", ms);
-  } else if (page == 2) {
-    gDisp.overlay("3/3 OPEN", "192.168.4.1", "", "", ms);
-  } else {
-    gDisp.overlay("THEN", "Save WiFi", "& Reboot", "", ms);
+  switch (page) {
+    case 0: gDisp.overlay("1/3 JOIN", AP_SSID, "", "", ms); break;       // the WiFi name
+    case 1: gDisp.overlay("1/3 PASS", gSet.apPass, "", "", ms); break;   // its password
+    case 2: gDisp.overlay("2/3 OPEN", "browser", "", "", ms); break;
+    case 3: gDisp.overlay("2/3 URL", "192.168.4.1", "", "", ms); break;  // type this address
+    case 4: gDisp.overlay("3/3 ENTER", "WiFi &", "LibreLink", "", ms); break;
+    default:
+      if (gProvisioning) gDisp.overlay("3/3 THEN", "tap Save", "& Reboot", "", ms);
+      else gDisp.overlay("3/3 THEN", "tap Save", "", "", ms);
   }
 }
 
-// Called every render tick while the setup WiFi is on: rotates instruction screens and the glucose view.
-static void updateSetupScreens(const View& v) {
+// Called every render tick while the setup WiFi is on: steps through the instruction screens. Not
+// provisioning: the live glucose view gets one slot at the end of each round. The instructions
+// are never skipped, even when glucose is critical (the glucose slot still shows that alert).
+static void updateSetupScreens(const View&) {
   if (!gSetupAp) return;
   if (busyAt(millis())) return;  // a button-driven screen is showing
-  if (isCritical(v.state)) {          // never hide a critical glucose alert behind instructions
-    gDisp.clearOverlay();
-    gLastSlot = 255;
-    return;
-  }
-  const uint32_t slots = 4;  // 3 instruction pages + (provisioning: the THEN page, else: the glucose view)
+  const uint32_t slots = SETUP_PAGES + (gProvisioning ? 0 : 1);
   uint8_t slot = (uint8_t)(((millis() - gApStartMs) / PAGE_MS) % slots);
   if (slot == gLastSlot) return;
   gLastSlot = slot;
-  if (slot == 3 && !gProvisioning) gDisp.clearOverlay();
+  if (slot >= SETUP_PAGES) gDisp.clearOverlay();
   else showSetupPage(slot, PAGE_MS + 300);
 }
 
@@ -198,7 +199,7 @@ static void toggleSetupMode() {
   } else {
     gDisp.showNow("SETUP", "starting");
     startSetupAp(false);
-    gDisp.overlay("SETUP ON", "Follow", "screens", "", 1500);
+    gDisp.overlay("SETUP ON", "Follow", "steps", "", 1500);
     gBusyUntil = millis() + 1500;
   }
 }
@@ -427,8 +428,7 @@ void setup() {
   gDisp.begin();
   gDisp.applySettings(gSet);
   gDisp.setHistory(&gHist);
-  gDisp.showNow("glucoGlow", "v" FW_VERSION);
-  delay(1000);
+  gDisp.intro("v" FW_VERSION);  // animated welcome
   if (gAfterCrash) {
     char code[16];
     snprintf(code, sizeof code, "code %d", (int)why);

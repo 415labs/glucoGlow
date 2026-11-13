@@ -115,6 +115,115 @@ void Display::applySettings(const Settings& s) {
   u8g2.setDisplayRotation(cb);
 }
 
+// ---------------------------------------------------------------------------------------------
+// Intro: a wireframe gem spins in, shrinks aside and "Welcome to glucoGlow" types out.
+// ---------------------------------------------------------------------------------------------
+static void drawGem(float cx, float cy, float scale, float yaw, float tilt) {
+  // crown (table hexagon + girdle hexagon) and pavilion apex
+  const int N = 6;
+  float vx[2 * N + 1], vy[2 * N + 1], vz[2 * N + 1];
+  for (int i = 0; i < N; i++) {
+    float a = i * 2.0f * (float)M_PI / N;
+    vx[i] = 0.55f * cosf(a); vy[i] = -0.5f; vz[i] = 0.55f * sinf(a);          // table
+    vx[N + i] = 1.0f * cosf(a); vy[N + i] = 0.05f; vz[N + i] = 1.0f * sinf(a);  // girdle
+  }
+  vx[2 * N] = 0; vy[2 * N] = 1.2f; vz[2 * N] = 0;                              // apex
+  int px[2 * N + 1], py[2 * N + 1];
+  float cy_ = cosf(yaw), sy_ = sinf(yaw), ct = cosf(tilt), st = sinf(tilt);
+  for (int i = 0; i <= 2 * N; i++) {
+    float x = vx[i] * cy_ + vz[i] * sy_, z = -vx[i] * sy_ + vz[i] * cy_, y = vy[i];
+    float y2 = y * ct - z * st, z2 = y * st + z * ct;
+    float p = 3.2f / (3.2f + z2);
+    px[i] = (int)lroundf(cx + x * p * scale);
+    py[i] = (int)lroundf(cy + y2 * p * scale);
+  }
+  for (int i = 0; i < N; i++) {
+    int j = (i + 1) % N;
+    u8g2.drawLine(px[i], py[i], px[j], py[j]);              // table ring
+    u8g2.drawLine(px[N + i], py[N + i], px[N + j], py[N + j]);  // girdle ring
+    u8g2.drawLine(px[i], py[i], px[N + i], py[N + i]);      // crown facets
+    u8g2.drawLine(px[i], py[i], px[N + j], py[N + j]);
+    u8g2.drawLine(px[N + i], py[N + i], px[2 * N], py[2 * N]);  // pavilion
+  }
+}
+
+static void drawSparkle(int x, int y, int r) {
+  u8g2.drawPixel(x, y);
+  if (r >= 1) { u8g2.drawPixel(x - 1, y); u8g2.drawPixel(x + 1, y); u8g2.drawPixel(x, y - 1); u8g2.drawPixel(x, y + 1); }
+  if (r >= 2) { u8g2.drawPixel(x - 2, y); u8g2.drawPixel(x + 2, y); u8g2.drawPixel(x, y - 2); u8g2.drawPixel(x, y + 2); }
+}
+
+static float easeOut(float t) { t = t < 0 ? 0 : (t > 1 ? 1 : t); return 1 - (1 - t) * (1 - t) * (1 - t); }
+
+// Draws the first `n` characters of `s`.
+static void drawTyped(int x, int y, const char* s, int n) {
+  char buf[16];
+  int len = (int)strlen(s);
+  if (n > len) n = len;
+  if (n <= 0) return;
+  memcpy(buf, s, n);
+  buf[n] = 0;
+  u8g2.drawStr(x, y, buf);
+}
+
+void Display::intro(const char* version) {
+  const uint32_t TOTAL = 4500, FLY = 1500, SHRINK = 700;
+  u8g2.setContrast(60);  // clearly visible, still gentle
+  lastContrast_ = 60;
+  const uint32_t t0 = millis();
+  for (;;) {
+    uint32_t t = millis() - t0;
+    if (t >= TOTAL) break;
+    u8g2.clearBuffer();
+    float yaw = t * 0.0045f;                       // about one turn per 1.4 s
+    float tilt = 0.35f + 0.1f * sinf(t * 0.003f);
+    float k = t < FLY ? 0.0f : easeOut((t - FLY) / (float)SHRINK);  // 0 = centred, 1 = parked
+    float grow = easeOut(t / 900.0f);
+    if (!portrait_) {
+      float cx = 36 + (62 - 36) * k, cy = 20 + (9 - 20) * k;
+      float sc = (17.0f * (1 - k) + 7.0f * k) * grow;
+      drawGem(cx, cy, sc, yaw, tilt);
+      if (t > FLY) {
+        uint32_t tt = t - FLY;
+        u8g2.setFont(u8g2_font_5x7_tr);
+        drawTyped(0, 8, "Welcome to", (int)(tt / 70));
+        u8g2.setFont(u8g2_font_8x13B_tr);
+        drawTyped(0, 29, "glucoGlow", (int)((tt > 800 ? tt - 800 : 0) / 90));
+        if (tt > 2300) {
+          u8g2.setFont(u8g2_font_4x6_tr);
+          u8g2.drawStr(0, 39, version);
+        }
+      }
+      // twinkles around the gem while it is centred
+      if (k < 0.5f) {
+        int ph = (int)(t / 120);
+        drawSparkle(8 + (ph * 7) % 12, 6 + (ph * 5) % 10, ph % 3);
+        drawSparkle(56 + (ph * 3) % 12, 28 + (ph * 7) % 8, (ph + 1) % 3);
+      }
+    } else {
+      float cx = 20, cy = 36 + (14 - 36) * k;
+      float sc = (15.0f * (1 - k) + 10.0f * k) * grow;
+      drawGem(cx, cy, sc, yaw, tilt);
+      if (t > FLY) {
+        uint32_t tt = t - FLY;
+        u8g2.setFont(u8g2_font_5x7_tr);
+        drawTyped(2, 37, "Welcome", (int)(tt / 70));
+        drawTyped(2, 45, "to", (int)((tt > 500 ? tt - 500 : 0) / 70));
+        u8g2.setFont(u8g2_font_8x13B_tr);
+        drawTyped(0, 57, "gluco", (int)((tt > 800 ? tt - 800 : 0) / 90));
+        drawTyped(0, 70, "Glow", (int)((tt > 1300 ? tt - 1300 : 0) / 90));
+      }
+      if (k < 0.5f) {
+        int ph = (int)(t / 120);
+        drawSparkle(4 + (ph * 7) % 10, 8 + (ph * 5) % 10, ph % 3);
+        drawSparkle(30 + (ph * 3) % 8, 56 + (ph * 7) % 12, (ph + 1) % 3);
+      }
+    }
+    u8g2.sendBuffer();
+    delay(25);
+  }
+}
+
 void Display::setContrastIfChanged(uint8_t c) {
   if (c != lastContrast_) {
     u8g2.setContrast(c);

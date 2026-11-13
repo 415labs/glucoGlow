@@ -19,6 +19,8 @@ struct View {
 class Display {
  public:
   void begin();
+  // Animated welcome (blocking, about 4.5 s): a spinning gem, then "Welcome to glucoGlow".
+  void intro(const char* version);
   void setHistory(const History* h) { hist_ = h; }
   void applySettings(const Settings& s);  // (re)configures the screen rotation
   // Call often (every ~50 ms). `timeValid`/`minuteOfDay` drive the day/night schedule.
