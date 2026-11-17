@@ -1,6 +1,6 @@
 # glucoGlow
 
-Bedside glucose display for the **ESP32-C3 0.42" OLED** board. Successor of [glucoLed2](https://github.com/415labs/glucoLed2) (Raspberry Pi + LED), rebuilt as a standalone device: it polls LibreLinkUp, shows the value, trend arrow and age of the reading on the built-in 72x40 OLED, and stays dim (but visible) at night. Everything is configured from a web app served by the device itself.
+Bedside glucose display for the **ESP32-C3 0.42" OLED** board. It polls LibreLinkUp, shows the value, trend arrow and age of the reading on the built-in 72x40 OLED, and stays dim (but visible) at night. Everything is configured from a web app served by the device itself.
 
 > **Not a medical device.** This is a convenience display. Keep your official CGM alarms enabled. It relies on the unofficial LibreLinkUp API, which can change without notice.
 
